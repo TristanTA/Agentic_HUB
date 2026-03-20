@@ -126,6 +126,18 @@ class ControlPlaneService:
         if command is None:
             return {"status": "ignored", "reason": "not_a_command"}
 
+        if command.name == "status":
+            return {"status": "ok", "hub": self.status(), "health": self.health()}
+        if command.name == "reload":
+            return self.reload_config()
+        if command.name == "pause":
+            return self.pause_hub()
+        if command.name == "resume":
+            return self.resume_hub()
+        if command.name == "restart":
+            return self.restart_hub()
+        if command.name == "errors":
+            return {"status": "ok", "errors": self.inspect_recent_errors()}
         if command.name == "new_agent":
             if not command.args or "purpose" not in command.options or "model" not in command.options:
                 return {
@@ -154,6 +166,30 @@ class ControlPlaneService:
             "command": command.name,
             "message": self.manager_agent.describe_command_help(command),
         }
+
+    def format_management_result(self, result: dict) -> str:
+        status = result.get("status", "ok")
+        if status == "created" and result.get("agent_id"):
+            files = result.get("files", {})
+            lines = [
+                f"Created agent: {result['agent_id']}",
+                f"Soul: {files.get('soul', '')}",
+                f"Prompt: {files.get('prompt', '')}",
+                f"Config: {files.get('config', '')}",
+            ]
+            return "\n".join(lines)
+        if status == "needs_input":
+            return result.get("message", "Missing required input.")
+        if status == "unsupported":
+            return result.get("message", "Unsupported command.")
+        if "hub" in result and "health" in result:
+            return f"Hub: {result['hub']}\nHealth: {result['health']}"
+        if "errors" in result:
+            errors = result["errors"]
+            if not errors:
+                return "No recent errors."
+            return "\n".join(f"{item['run_id']}: {item['errors']}" for item in errors[:5])
+        return str(result)
 
 
 def build_app(root_dir: Path) -> FastAPI:

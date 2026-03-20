@@ -32,4 +32,6 @@ class ManagerAgent:
                 "Usage: /new_agent <agent_id> --purpose \"What it does\" "
                 "--model <model_id> [--skills skill_a,skill_b] [--tools tool_a,tool_b]"
             )
+        if command.name in {"status", "reload", "pause", "resume", "restart", "errors"}:
+            return f"Usage: /{command.name}"
         return f"Unknown management command: /{command.name}"

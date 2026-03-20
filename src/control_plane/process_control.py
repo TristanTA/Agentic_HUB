@@ -25,10 +25,19 @@ class ProcessController:
     def _is_process_alive(self, pid: int | None) -> bool:
         if pid is None:
             return False
+        if os.name == "nt":
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            output = result.stdout.strip()
+            return bool(output and "No tasks are running" not in output and output != "INFO: No tasks are running which match the specified criteria.")
         try:
             os.kill(pid, 0)
             return True
-        except OSError:
+        except (OSError, SystemError):
             return False
 
     def status(self) -> dict:

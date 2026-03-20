@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from hub.inputs.normalize import normalize_telegram_payload
+from control_plane.service import ControlPlaneService
 from hub.registry.loader import load_registries
 from hub.runtime.service import HubRuntime
+from hub.telegram_runner import build_runner
 from shared.settings import AppSettings
 
 
@@ -20,7 +21,9 @@ def build_runtime(root_dir: str | Path | None = None) -> HubRuntime:
 
 def main() -> None:
     runtime = build_runtime()
-    runtime.process_event(normalize_telegram_payload({"text": "hello from local bootstrap", "thread_id": "bootstrap"}))
+    control_plane = ControlPlaneService(runtime.root_dir)
+    runner = build_runner(runtime, control_plane)
+    runner.run_forever()
 
 
 if __name__ == "__main__":

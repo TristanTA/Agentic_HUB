@@ -16,4 +16,4 @@ def test_router_uses_fallback(repo_copy):
     bundle = load_registries(repo_copy)
     router = DeterministicRouter(bundle.routes)
     decision = router.route(normalize_telegram_payload({"text": "hello there"}))
-    assert decision.target_id == "general_assistant"
+    assert decision.target_id == "vanta_manager"

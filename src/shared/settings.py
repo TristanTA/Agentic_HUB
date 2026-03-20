@@ -38,6 +38,8 @@ class AppSettings:
 
     @classmethod
     def load(cls, root_dir: str | Path | None = None) -> "AppSettings":
+        initial_base = Path(root_dir or os.getenv("HUB_HOME") or Path.cwd()).resolve()
+        _load_env_file(initial_base)
         base = Path(root_dir or os.getenv("HUB_HOME") or Path.cwd()).resolve()
         return cls(
             root_dir=base,
@@ -53,6 +55,22 @@ class AppSettings:
             self.logs_dir,
             self.prompts_dir,
             self.skills_dir,
+            self.root_dir / "agents",
             self.workspace_dir / "agent_tasks",
         ]:
             path.mkdir(parents=True, exist_ok=True)
+
+
+def _load_env_file(root_dir: Path) -> None:
+    for filename in [".env", ".env.example"]:
+        path = root_dir / filename
+        if not path.exists():
+            continue
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)

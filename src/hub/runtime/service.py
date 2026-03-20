@@ -9,7 +9,7 @@ from hub.agents.factory import AgentFactory, HubAgent
 from hub.collaboration.workspace import MarkdownWorkspace
 from hub.models.providers import ModelRegistry
 from hub.outputs.telegram import TelegramOutputAdapter
-from hub.registry.loader import RegistryBundle
+from hub.registry.loader import RegistryBundle, load_registries
 from hub.router.router import DeterministicRouter
 from hub.tools.builtin import build_builtin_tools
 from hub.workflows.executor import WorkflowExecutor
@@ -32,8 +32,8 @@ class HubRuntime:
         self.workspace = MarkdownWorkspace(self.file_repo)
         self.model_registry = ModelRegistry(bundle.models)
         self.agent_factory = AgentFactory(self.model_registry)
-        self.built_tools = build_builtin_tools(self.file_repo, self.store)
         self.telegram_output = TelegramOutputAdapter(enabled=bundle.hub_config.telegram.enabled)
+        self.built_tools = build_builtin_tools(self.file_repo, self.store, self.telegram_output)
         self.state_path = root_dir / hub_cfg.state_path
         self.pid_path = root_dir / hub_cfg.pid_path
         self.agents = self._build_agents()
@@ -43,6 +43,23 @@ class HubRuntime:
             if workflow.enabled
         }
         self._write_state("running")
+
+    def reload_config(self) -> None:
+        self.bundle = load_registries(self.root_dir)
+        hub_cfg = self.bundle.hub_config.hub
+        self.router = DeterministicRouter(self.bundle.routes)
+        self.model_registry = ModelRegistry(self.bundle.models)
+        self.agent_factory = AgentFactory(self.model_registry)
+        self.telegram_output = TelegramOutputAdapter(enabled=self.bundle.hub_config.telegram.enabled)
+        self.built_tools = build_builtin_tools(self.file_repo, self.store, self.telegram_output)
+        self.state_path = self.root_dir / hub_cfg.state_path
+        self.pid_path = self.root_dir / hub_cfg.pid_path
+        self.agents = self._build_agents()
+        self.workflows = {
+            workflow.id: WorkflowExecutor(self.workspace, self.file_repo, self.agents)
+            for workflow in self.bundle.workflows.values()
+            if workflow.enabled
+        }
 
     def _build_agents(self) -> dict[str, HubAgent]:
         agents: dict[str, HubAgent] = {}
@@ -123,6 +140,9 @@ class HubRuntime:
 
     def _execute(self, decision: RouteDecision, context: AgentContext) -> str:
         if decision.target_type == TargetType.AGENT:
+            spec = self.bundle.agents[decision.target_id]
+            if self.model_registry.supports_function_tools(spec.preferred_model) and spec.allowed_tools:
+                return self._execute_agent_with_tools(spec, context)
             return self.agents[decision.target_id].handle(context, context.event.text).output_text
         if decision.target_type == TargetType.WORKFLOW:
             workflow = self.bundle.workflows[decision.target_id]
@@ -130,3 +150,44 @@ class HubRuntime:
         if decision.target_type == TargetType.TOOL:
             return json.dumps(self.built_tools[decision.target_id].invoke(context, {}).output)
         raise ValueError(f"Unsupported target type: {decision.target_type}")
+
+    def _execute_agent_with_tools(self, spec, context: AgentContext) -> str:
+        system_prompt = context.prompt_text
+        skill_blocks = [
+            self.file_repo.read_text(self.bundle.skills[skill_id].markdown_file)
+            for skill_id in spec.skill_ids
+        ]
+        if skill_blocks:
+            system_prompt = f"{system_prompt}\n\n" + "\n\n".join(skill_blocks)
+
+        tool_defs = []
+        for tool_id in spec.allowed_tools:
+            tool_spec = self.bundle.tools.get(tool_id)
+            builtin = self.built_tools.get(tool_id)
+            if tool_spec is None or builtin is None:
+                continue
+            tool_defs.append(
+                {
+                    "type": "function",
+                    "name": tool_id,
+                    "description": tool_spec.description,
+                    "parameters": tool_spec.input_schema or {"type": "object", "properties": {}},
+                }
+            )
+
+        def execute_tool(tool_name: str, tool_input: dict) -> dict:
+            tool = self.built_tools.get(tool_name)
+            if tool is None:
+                return {"ok": False, "error": f"Unknown tool {tool_name}"}
+            result = tool.invoke(context, tool_input)
+            if result.success:
+                return result.output
+            return {"ok": False, "error": result.error or "tool_failed"}
+
+        return self.model_registry.run_with_tools(
+            model_id=spec.preferred_model,
+            system_prompt=system_prompt,
+            user_input=context.event.text,
+            tools=tool_defs,
+            tool_executor=execute_tool,
+        )

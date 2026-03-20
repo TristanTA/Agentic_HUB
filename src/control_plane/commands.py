@@ -21,6 +21,8 @@ def parse_management_command(text: str) -> ManagementCommand | None:
         return None
 
     name = parts[0][1:].strip().lower()
+    if "@" in name:
+        name = name.split("@", 1)[0]
     args: list[str] = []
     options: dict[str, str] = {}
 

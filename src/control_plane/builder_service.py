@@ -30,6 +30,7 @@ class AgentBlueprint:
     preferred_model: str
     allowed_tools: list[str]
     skill_ids: list[str]
+    soul_prompt: str = ""
     memory_scope: str = "session"
     timeout: int = 30
     enabled: bool = True
@@ -42,7 +43,16 @@ class BuilderService:
         self.editor = editor
         self.file_repo = file_repo
 
-    def create_agent(self, *, name: str, purpose: str, model: str, skills: str = "", tools: str = "") -> dict:
+    def create_agent(
+        self,
+        *,
+        name: str,
+        purpose: str,
+        model: str,
+        skills: str = "",
+        tools: str = "",
+        soul_prompt: str = "",
+    ) -> dict:
         agent_id = _slugify(name)
         if not agent_id:
             raise ValueError("Agent name must include letters or numbers")
@@ -71,6 +81,7 @@ class BuilderService:
             preferred_model=model,
             allowed_tools=allowed_tools,
             skill_ids=skill_ids,
+            soul_prompt=soul_prompt.strip(),
         )
         return self._materialize_agent(blueprint)
 
@@ -159,6 +170,9 @@ class BuilderService:
                 "",
                 "## Purpose",
                 blueprint.purpose,
+                "",
+                "## Style",
+                blueprint.soul_prompt or "Operate clearly and efficiently.",
                 "",
                 "## Operating Rules",
                 "- Stay practical and concise.",

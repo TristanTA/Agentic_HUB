@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+import os
+from urllib import error, request
+
 from langchain_core.runnables import RunnableLambda
 
 from shared.schemas import ModelSpec
@@ -11,6 +15,8 @@ class ModelRegistry:
 
     def build_runnable(self, model_id: str):
         spec = self.models[model_id]
+        if spec.provider == "openai" and os.getenv("OPENAI_API_KEY", "").strip():
+            return RunnableLambda(lambda payload: self._invoke_openai(spec, payload))
 
         def invoke(payload):
             if isinstance(payload, str):
@@ -22,3 +28,135 @@ class ModelRegistry:
             return f"[{spec.model_name}] {text}"
 
         return RunnableLambda(invoke)
+
+    def supports_function_tools(self, model_id: str) -> bool:
+        return self.models[model_id].provider == "openai" and bool(os.getenv("OPENAI_API_KEY", "").strip())
+
+    def run_with_tools(
+        self,
+        *,
+        model_id: str,
+        system_prompt: str,
+        user_input: str,
+        tools: list[dict],
+        tool_executor,
+        max_rounds: int = 8,
+    ) -> str:
+        spec = self.models[model_id]
+        if spec.provider != "openai":
+            return self._coerce_payload_to_text(user_input)
+        if not os.getenv("OPENAI_API_KEY", "").strip():
+            return self._coerce_payload_to_text(user_input)
+
+        response = self._post_openai_response(
+            spec,
+            {
+                "model": spec.model_name,
+                "instructions": system_prompt,
+                "input": user_input,
+                "tools": tools,
+                "parallel_tool_calls": False,
+                **spec.defaults,
+            },
+        )
+        rounds = 0
+        while rounds < max_rounds:
+            function_calls = [
+                item for item in response.get("output", []) if item.get("type") == "function_call"
+            ]
+            if not function_calls:
+                break
+
+            tool_outputs = []
+            for call in function_calls:
+                raw_args = call.get("arguments") or "{}"
+                try:
+                    parsed_args = json.loads(raw_args)
+                except json.JSONDecodeError:
+                    parsed_args = {}
+                result = tool_executor(call.get("name", ""), parsed_args)
+                tool_outputs.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": call.get("call_id"),
+                        "output": json.dumps(result),
+                    }
+                )
+
+            response = self._post_openai_response(
+                spec,
+                {
+                    "model": spec.model_name,
+                    "instructions": system_prompt,
+                    "previous_response_id": response.get("id"),
+                    "input": tool_outputs,
+                    "tools": tools,
+                    "parallel_tool_calls": False,
+                    **spec.defaults,
+                },
+            )
+            rounds += 1
+
+        return self._extract_output_text(response)
+
+    def _invoke_openai(self, spec: ModelSpec, payload) -> str:
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY is not configured")
+
+        text = self._coerce_payload_to_text(payload)
+        payload = self._post_openai_response(
+            spec,
+            {
+                "model": spec.model_name,
+                "input": text,
+                **spec.defaults,
+            },
+        )
+        return self._extract_output_text(payload)
+
+    def _post_openai_response(self, spec: ModelSpec, body: dict) -> dict:
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY is not configured")
+
+        req = request.Request(
+            "https://api.openai.com/v1/responses",
+            data=json.dumps(body).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=spec.timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"OpenAI API error ({exc.code}): {detail}") from exc
+        except error.URLError as exc:
+            raise RuntimeError(f"OpenAI request failed: {exc.reason}") from exc
+
+    def _extract_output_text(self, payload: dict) -> str:
+        output_text = payload.get("output_text")
+        if isinstance(output_text, str) and output_text.strip():
+            return output_text.strip()
+
+        parts: list[str] = []
+        for item in payload.get("output", []):
+            for content in item.get("content", []):
+                if content.get("type") == "output_text":
+                    parts.append(content.get("text", ""))
+        return "\n".join(part for part in parts if part).strip()
+
+    def _coerce_payload_to_text(self, payload) -> str:
+        if isinstance(payload, str):
+            return payload
+        if isinstance(payload, dict):
+            return payload.get("input") or payload.get("text") or json.dumps(payload)
+        if hasattr(payload, "to_string"):
+            return payload.to_string()
+        if hasattr(payload, "to_messages"):
+            return "\n".join(str(message.content) for message in payload.to_messages())
+        return str(payload)

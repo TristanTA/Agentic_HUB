@@ -3,7 +3,7 @@ purpose: Primary manager agent for control, task execution, and autonomous opera
 soul_file: agents/vanta_manager/soul.md
 prompt_file: prompts/agents/vanta_manager.md
 loadout_id: vanta_manager_minimal
-preferred_model: echo_model
+preferred_model: openai_gpt5_mini
 skill_ids:
   - general_style
 allowed_tools:

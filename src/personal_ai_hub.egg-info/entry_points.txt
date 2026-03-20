@@ -1,0 +1,3 @@
+[console_scripts]
+hub-control = control_plane.main:main
+hub-runtime = hub.main:main

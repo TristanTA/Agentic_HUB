@@ -1,0 +1,170 @@
+from __future__ import annotations
+
+import json
+import os
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from urllib import error, parse, request
+
+from control_plane.service import ControlPlaneService
+from control_plane.wizard import TelegramWizardService
+from hub.inputs.normalize import normalize_telegram_payload
+from hub.runtime.service import HubRuntime
+from storage.sqlite.db import SQLiteStore
+
+
+@dataclass(slots=True)
+class TelegramBotRunner:
+    runtime: HubRuntime
+    control_plane: ControlPlaneService
+    wizard: TelegramWizardService
+    bot_token: str
+    allowed_chat_ids: set[str]
+    offset_path: Path
+
+    def run_forever(self, poll_timeout: int = 30, sleep_seconds: float = 1.0) -> None:
+        self.offset_path.parent.mkdir(parents=True, exist_ok=True)
+        self._register_commands()
+        while True:
+            try:
+                offset = self._load_offset()
+                updates = self._get_updates(offset=offset, timeout=poll_timeout)
+                for update in updates:
+                    update_id = int(update.get("update_id", 0))
+                    self._store_offset(update_id + 1)
+                    self._handle_update(update)
+                if not updates:
+                    time.sleep(sleep_seconds)
+            except Exception as exc:
+                self._log_error(f"telegram_runner_error: {type(exc).__name__}: {exc}")
+                time.sleep(sleep_seconds)
+
+    def _handle_update(self, update: dict) -> None:
+        callback_query = update.get("callback_query")
+        if callback_query:
+            self._handle_callback_query(callback_query)
+            return
+
+        event = normalize_telegram_payload(update)
+        thread_id = str(event.thread_id)
+        if self.allowed_chat_ids and thread_id not in self.allowed_chat_ids:
+            return
+
+        session_key = self._session_key(chat_id=thread_id, user_id=str(update.get("message", {}).get("from", {}).get("id", "")))
+        wizard_reply = self.wizard.handle_text(session_key, event.text)
+        if wizard_reply is not None:
+            self.runtime.telegram_output.send(
+                {"thread_id": thread_id, "text": wizard_reply.text, "reply_markup": wizard_reply.reply_markup}
+            )
+            return
+
+        if event.text.startswith("/"):
+            if event.text.split()[0].startswith("/new_agent"):
+                wizard_result = self.wizard.start_new_agent(session_key)
+                self.runtime.telegram_output.send(
+                    {"thread_id": thread_id, "text": wizard_result.text, "reply_markup": wizard_result.reply_markup}
+                )
+                return
+            result = self.control_plane.handle_management_command(event.text)
+            if result.get("status") in {"created", "reloaded"}:
+                self.runtime.reload_config()
+            text = self.control_plane.format_management_result(result)
+            self.runtime.telegram_output.send({"thread_id": thread_id, "text": text})
+            return
+
+        self.runtime.telegram_output.send_chat_action(thread_id, "typing")
+        result = self.runtime.process_event(event)
+        if result.get("status") == "paused":
+            self.runtime.telegram_output.send({"thread_id": thread_id, "text": "Hub is paused."})
+
+    def _handle_callback_query(self, callback_query: dict) -> None:
+        callback_id = callback_query.get("id", "")
+        message = callback_query.get("message", {})
+        chat_id = str(message.get("chat", {}).get("id", ""))
+        user_id = str(callback_query.get("from", {}).get("id", ""))
+        if self.allowed_chat_ids and chat_id not in self.allowed_chat_ids:
+            return
+
+        session_key = self._session_key(chat_id=chat_id, user_id=user_id)
+        result = self.wizard.handle_callback(session_key, callback_query.get("data", ""))
+        self.runtime.telegram_output.answer_callback_query(callback_id)
+        if result is None:
+            return
+        if result.final_result and result.final_result.get("status") in {"created", "reloaded"}:
+            self.runtime.reload_config()
+        self.runtime.telegram_output.send(
+            {"thread_id": chat_id, "text": result.text, "reply_markup": result.reply_markup}
+        )
+
+    def _get_updates(self, *, offset: int, timeout: int) -> list[dict]:
+        query = parse.urlencode({"offset": offset, "timeout": timeout})
+        url = f"https://api.telegram.org/bot{self.bot_token}/getUpdates?{query}"
+        req = request.Request(url, method="GET")
+        try:
+            with request.urlopen(req, timeout=timeout + 10) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Telegram getUpdates failed ({exc.code}): {detail}") from exc
+        except error.URLError as exc:
+            raise RuntimeError(f"Telegram network error: {exc.reason}") from exc
+
+        if not payload.get("ok", False):
+            raise RuntimeError(f"Telegram API returned not ok: {payload}")
+        return payload.get("result", [])
+
+    def _load_offset(self) -> int:
+        if not self.offset_path.exists():
+            return 0
+        raw = self.offset_path.read_text(encoding="utf-8").strip()
+        try:
+            return int(raw)
+        except ValueError:
+            return 0
+
+    def _store_offset(self, offset: int) -> None:
+        self.offset_path.write_text(str(offset), encoding="utf-8")
+
+    def _log_error(self, message: str) -> None:
+        log_path = self.runtime.root_dir / "logs" / "telegram_runner.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(message + "\n")
+
+    def _register_commands(self) -> None:
+        commands = [
+            {"command": "new_agent", "description": "Create a new agent with a guided wizard"},
+            {"command": "status", "description": "Show hub and health status"},
+            {"command": "reload", "description": "Reload hub configuration"},
+            {"command": "errors", "description": "Show recent runtime errors"},
+            {"command": "pause", "description": "Pause the hub"},
+            {"command": "resume", "description": "Resume the hub"},
+            {"command": "restart", "description": "Restart the hub"},
+        ]
+        self.runtime.telegram_output.set_my_commands(commands)
+
+    def _session_key(self, *, chat_id: str, user_id: str) -> str:
+        return f"{chat_id}:{user_id}"
+
+
+def build_runner(runtime: HubRuntime, control_plane: ControlPlaneService) -> TelegramBotRunner:
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    if not bot_token:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN is not configured")
+
+    allowed_chat_ids = {
+        item.strip()
+        for item in runtime.bundle.hub_config.telegram.allowed_chat_ids
+        if str(item).strip()
+    }
+    offset_path = runtime.root_dir / "data" / "telegram_update_offset.txt"
+    wizard = TelegramWizardService(SQLiteStore(runtime.root_dir / runtime.bundle.hub_config.hub.sqlite_path), control_plane.builder)
+    return TelegramBotRunner(
+        runtime=runtime,
+        control_plane=control_plane,
+        wizard=wizard,
+        bot_token=bot_token,
+        allowed_chat_ids=allowed_chat_ids,
+        offset_path=offset_path,
+    )

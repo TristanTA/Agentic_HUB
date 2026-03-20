@@ -47,6 +47,11 @@ class SQLiteStore:
                     details_json TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
+                CREATE TABLE IF NOT EXISTS telegram_sessions (
+                    session_key TEXT PRIMARY KEY,
+                    state_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
                 """
             )
 
@@ -137,3 +142,30 @@ class SQLiteStore:
         if not row:
             return None
         return {"status": row[0], "details": json.loads(row[1]), "created_at": row[2]}
+
+    def upsert_telegram_session(self, session_key: str, state: dict[str, Any]) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO telegram_sessions (session_key, state_json, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(session_key) DO UPDATE
+                SET state_json = excluded.state_json,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (session_key, json.dumps(state)),
+            )
+
+    def get_telegram_session(self, session_key: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT state_json FROM telegram_sessions WHERE session_key = ?",
+                (session_key,),
+            ).fetchone()
+        if not row:
+            return None
+        return json.loads(row[0])
+
+    def delete_telegram_session(self, session_key: str) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM telegram_sessions WHERE session_key = ?", (session_key,))

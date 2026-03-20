@@ -6,7 +6,7 @@ agents:
     loadout_id: vanta_manager_minimal
     skill_ids: [general_style]
     allowed_tools: [trace_lookup, file_read, file_write, workspace_note, message_user]
-    preferred_model: echo_model
+    preferred_model: openai_gpt5_mini
     memory_scope: session
     timeout: 30
     enabled: true

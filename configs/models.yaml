@@ -1,4 +1,12 @@
 models:
+  - id: openai_gpt5_mini
+    provider: openai
+    model_name: gpt-5-mini
+    timeout: 60
+    defaults:
+      reasoning:
+        effort: low
+    enabled: true
   - id: echo_model
     provider: local
     model_name: echo
