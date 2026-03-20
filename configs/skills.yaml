@@ -1,0 +1,11 @@
+skills:
+  - id: general_style
+    name: General Style
+    markdown_file: skills/general_style.md
+    description: Keep responses practical and concise.
+    enabled: true
+  - id: planning_checklist
+    name: Planning Checklist
+    markdown_file: skills/planning_checklist.md
+    description: Encourage explicit plans and checklists.
+    enabled: true

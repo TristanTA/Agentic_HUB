@@ -1,0 +1,36 @@
+# Personal AI Hub
+
+Personal AI Hub is a self-hosted orchestration repo for running personal agents behind one local runtime while keeping management and recovery outside that runtime.
+
+## Architecture
+
+The system has two independent processes:
+
+- `hub`: receives inputs, routes deterministically, executes LangChain-built agents/tools/workflows, and writes traces.
+- `control_plane`: supervises the hub, reads logs/configs directly, edits prompts and skills, and handles pause/resume/restart even when the hub is unhealthy.
+
+Agents are configured from YAML, built from Markdown prompts plus Markdown skill packs, and can hand work to each other through hub-managed Markdown task/result files.
+
+## Run locally
+
+```bash
+pip install -e .[dev]
+hub-runtime
+hub-control serve
+```
+
+The Telegram adapter is a placeholder in V1. It normalizes inbound payloads but does not yet maintain a live bot connection.
+
+## Migrating an existing agent
+
+1. Add a prompt in `prompts/agents/`.
+2. Add any reusable skills in `skills/`.
+3. Register the agent in `configs/agents.yaml`.
+4. Bind allowed tools and a preferred model.
+5. If needed, add a thin adapter under `src/hub/agents/`.
+
+## Testing
+
+```bash
+pytest
+```

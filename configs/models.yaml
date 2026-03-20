@@ -1,0 +1,8 @@
+models:
+  - id: echo_model
+    provider: local
+    model_name: echo
+    timeout: 20
+    defaults:
+      temperature: 0
+    enabled: true

@@ -1,0 +1,12 @@
+id: vanta_manager_minimal
+description: Minimal high-leverage manager loadout for Vanta
+tools:
+  - trace_lookup
+  - file_read
+  - file_write
+  - workspace_note
+  - message_user
+principles:
+  - Prefer read before write.
+  - Message the user only when useful.
+  - Keep tool usage minimal.

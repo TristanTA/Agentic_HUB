@@ -1,0 +1,13 @@
+workflows:
+  - id: planner_to_general
+    timeout: 60
+    enabled: true
+    steps:
+      - type: agent
+        target_id: planner_agent
+      - type: markdown_task
+        source_agent: planner_agent
+        target_agent: general_assistant
+        intent: Summarize the plan for the user
+      - type: agent_task
+        target_id: general_assistant

@@ -1,0 +1,15 @@
+environment: development
+hub:
+  name: personal-ai-hub
+  paused: false
+  default_agent: vanta_manager
+  log_level: INFO
+  sqlite_path: data/hub.db
+  structured_log_path: logs/structured.log
+  human_log_path: logs/hub.log
+  state_path: data/hub_state.json
+  pid_path: data/hub.pid
+telegram:
+  enabled: true
+  bot_token_env: TELEGRAM_BOT_TOKEN
+  allowed_chat_ids: []

@@ -1,0 +1,86 @@
+tools:
+  - id: workspace_note
+    description: Write a note to the run workspace
+    input_schema:
+      type: object
+      properties:
+        filename:
+          type: string
+        content:
+          type: string
+    output_schema:
+      type: object
+      properties:
+        path:
+          type: string
+    side_effect_level: low
+    permissions: [workspace_write]
+    enabled: true
+  - id: trace_lookup
+    description: Look up a past run trace
+    input_schema:
+      type: object
+      properties:
+        run_id:
+          type: string
+    output_schema:
+      type: object
+      properties:
+        run_id:
+          type: string
+        status:
+          type: string
+    side_effect_level: none
+    permissions: [trace_read]
+    enabled: true
+  - id: file_read
+    description: Read a repository file by relative path
+    input_schema:
+      type: object
+      properties:
+        path:
+          type: string
+    output_schema:
+      type: object
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+    side_effect_level: none
+    permissions: [repo_read]
+    enabled: true
+  - id: file_write
+    description: Write a repository file by relative path
+    input_schema:
+      type: object
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+    output_schema:
+      type: object
+      properties:
+        path:
+          type: string
+    side_effect_level: high
+    permissions: [repo_write]
+    enabled: true
+  - id: message_user
+    description: Queue a message for the user without returning it as the main response
+    input_schema:
+      type: object
+      properties:
+        text:
+          type: string
+    output_schema:
+      type: object
+      properties:
+        path:
+          type: string
+        thread_id:
+          type: string
+    side_effect_level: low
+    permissions: [user_message]
+    enabled: true

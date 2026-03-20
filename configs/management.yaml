@@ -1,0 +1,6 @@
+management:
+  host: 127.0.0.1
+  port: 8011
+  audit_actor: local_operator
+  allow_prompt_edits: true
+  allow_skill_edits: true
