@@ -4,6 +4,7 @@ import yaml
 
 from control_plane.commands import parse_management_command
 from control_plane.service import ControlPlaneService
+from hub.main import build_runtime
 
 
 def test_parse_management_command_supports_args_and_options():
@@ -47,3 +48,28 @@ def test_new_agent_command_returns_help_when_required_fields_are_missing(repo_co
     assert result["status"] == "needs_input"
     assert result["command"] == "new_agent"
     assert "/new_agent <agent_id>" in result["message"]
+
+
+def test_attach_agent_command_creates_external_profile(repo_copy):
+    service = ControlPlaneService(repo_copy)
+
+    result = service.handle_management_command(
+        '/attach_agent rowan --purpose "Wedding planning helper" --adapter_type telegram_bot --bot_token_env ROWAN_BOT_TOKEN --chat_id 12345 --exposure_mode hub_addressable'
+    )
+
+    assert result["status"] == "created"
+    local_config = (repo_copy / "agents" / "rowan" / "config.yaml").read_text(encoding="utf-8")
+    assert "external_adapter" in local_config
+    assert "telegram_bot" in local_config
+
+
+def test_delegate_command_dispatches_structured_task(repo_copy):
+    runtime = build_runtime(repo_copy)
+    service = ControlPlaneService(repo_copy)
+    service.bind_runtime(runtime)
+
+    result = service.handle_management_command('/delegate --assigned_to planner_agent --goal "Plan migration steps"')
+
+    assert result["status"] == "ok"
+    assert result["task"]["assigned_to"] == "planner_agent"
+    assert result["task"]["status"] in {"completed", "failed", "running"}

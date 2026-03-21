@@ -31,10 +31,17 @@ class AgentBlueprint:
     allowed_tools: list[str]
     skill_ids: list[str]
     soul_prompt: str = ""
+    exposure_mode: str = "internal_worker"
+    execution_mode: str = "native_hub"
+    adapter_type: str = "native"
+    adapter_config: dict = None
+    telegram_profile_id: str | None = None
+    can_receive_tasks: bool = True
+    can_receive_messages: bool = False
+    telegram: dict = None
     memory_scope: str = "session"
     timeout: int = 30
     enabled: bool = True
-    adapter_type: str = "langchain_markdown"
 
 
 class BuilderService:
@@ -52,6 +59,13 @@ class BuilderService:
         skills: str = "",
         tools: str = "",
         soul_prompt: str = "",
+        exposure_mode: str = "internal_worker",
+        execution_mode: str = "native_hub",
+        adapter_type: str = "native",
+        adapter_config: dict | None = None,
+        telegram: dict | None = None,
+        can_receive_tasks: bool = True,
+        can_receive_messages: bool = False,
     ) -> dict:
         agent_id = _slugify(name)
         if not agent_id:
@@ -82,6 +96,14 @@ class BuilderService:
             allowed_tools=allowed_tools,
             skill_ids=skill_ids,
             soul_prompt=soul_prompt.strip(),
+            exposure_mode=exposure_mode,
+            execution_mode=execution_mode,
+            adapter_type=adapter_type,
+            adapter_config=adapter_config or {},
+            telegram_profile_id=agent_id if exposure_mode == "standalone_telegram" else None,
+            can_receive_tasks=can_receive_tasks,
+            can_receive_messages=can_receive_messages,
+            telegram=telegram or {},
         )
         return self._materialize_agent(blueprint)
 
@@ -101,6 +123,14 @@ class BuilderService:
             "purpose": blueprint.purpose,
             "soul_file": soul_relative_path,
             "prompt_file": prompt_relative_path,
+            "exposure_mode": blueprint.exposure_mode,
+            "execution_mode": blueprint.execution_mode,
+            "adapter_type": blueprint.adapter_type,
+            "adapter_config": blueprint.adapter_config or {},
+            "telegram_profile_id": blueprint.telegram_profile_id,
+            "can_receive_tasks": blueprint.can_receive_tasks,
+            "can_receive_messages": blueprint.can_receive_messages,
+            "telegram": blueprint.telegram or {},
             "preferred_model": blueprint.preferred_model,
             "skill_ids": blueprint.skill_ids,
             "allowed_tools": blueprint.allowed_tools,
@@ -113,6 +143,16 @@ class BuilderService:
             "id": blueprint.agent_id,
             "purpose": blueprint.purpose,
             "prompt_file": prompt_relative_path,
+            "soul_file": soul_relative_path,
+            "loadout_id": f"{blueprint.agent_id}_loadout",
+            "exposure_mode": blueprint.exposure_mode,
+            "execution_mode": blueprint.execution_mode,
+            "adapter_type": blueprint.adapter_type,
+            "adapter_config": blueprint.adapter_config or {},
+            "telegram_profile_id": blueprint.telegram_profile_id,
+            "can_receive_tasks": blueprint.can_receive_tasks,
+            "can_receive_messages": blueprint.can_receive_messages,
+            "telegram": blueprint.telegram or {},
             "skill_ids": blueprint.skill_ids,
             "allowed_tools": blueprint.allowed_tools,
             "preferred_model": blueprint.preferred_model,
@@ -128,7 +168,18 @@ class BuilderService:
             local_config_relative_path,
             yaml.safe_dump(local_config, sort_keys=False),
         )
-        registered = self.editor.append_section_item("configs/agents.yaml", "agents", central_config)
+        loadout_path = self.file_repo.write_text(
+            f"agents/{blueprint.agent_id}/loadout.yaml",
+            yaml.safe_dump(
+                {
+                    "id": f"{blueprint.agent_id}_loadout",
+                    "description": f"Loadout for {blueprint.agent_id}",
+                    "tools": blueprint.allowed_tools,
+                },
+                sort_keys=False,
+            ),
+        )
+        registered = self.editor.upsert_section_item("configs/agents.yaml", "agents", central_config)
 
         return {
             "status": "created",
@@ -139,6 +190,7 @@ class BuilderService:
                 "soul": str(soul_path),
                 "prompt": str(prompt_path),
                 "config": str(config_path),
+                "loadout": str(loadout_path),
             },
             "next_steps": [
                 "Reload the hub config before routing traffic to the new agent.",
@@ -197,9 +249,38 @@ class BuilderService:
                 blueprint.purpose,
                 "",
                 "## Runtime Notes",
+                f"- Exposure mode: {blueprint.exposure_mode}",
+                f"- Execution mode: {blueprint.execution_mode}",
+                f"- Adapter type: {blueprint.adapter_type}",
                 f"- Allowed tools: {tools}",
                 f"- Attached skills: {skills}",
                 "- Keep responses actionable.",
                 "",
             ]
+        )
+
+    def attach_external_agent(
+        self,
+        *,
+        name: str,
+        purpose: str,
+        adapter_type: str,
+        adapter_config: dict,
+        exposure_mode: str = "hub_addressable",
+        telegram: dict | None = None,
+    ) -> dict:
+        return self.create_agent(
+            name=name,
+            purpose=purpose,
+            model="echo_model",
+            skills="general_style",
+            tools="message_user" if exposure_mode == "standalone_telegram" else "workspace_note",
+            soul_prompt="Act as a managed external agent wrapper.",
+            exposure_mode=exposure_mode,
+            execution_mode="external_adapter",
+            adapter_type=adapter_type,
+            adapter_config=adapter_config,
+            telegram=telegram or {},
+            can_receive_tasks=True,
+            can_receive_messages=True,
         )

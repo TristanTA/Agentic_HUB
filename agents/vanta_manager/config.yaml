@@ -3,10 +3,26 @@ purpose: Primary manager agent for control, task execution, and autonomous opera
 soul_file: agents/vanta_manager/soul.md
 prompt_file: prompts/agents/vanta_manager.md
 loadout_id: vanta_manager_minimal
+exposure_mode: standalone_telegram
+execution_mode: native_hub
+adapter_type: native
+adapter_config: {}
+telegram_profile_id: vanta_manager
+can_receive_tasks: true
+can_receive_messages: true
+telegram:
+  bot_token_env: TELEGRAM_BOT_TOKEN
+  allowed_chat_ids: []
+  owns_polling: true
 preferred_model: openai_gpt5_mini
 skill_ids:
   - general_style
 allowed_tools:
+  - delegate_task
+  - get_task
+  - list_tasks
+  - list_agents
+  - worker_health
   - trace_lookup
   - file_read
   - file_write
@@ -15,4 +31,3 @@ allowed_tools:
 memory_scope: session
 timeout: 30
 enabled: true
-adapter_type: langchain_markdown

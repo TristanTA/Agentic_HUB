@@ -23,6 +23,8 @@ The batch file opens two windows:
 - the hub runtime, which loads `vanta_manager` from `configs/agents.yaml`
 - the control plane server
 
+If port `8011` is already in use, the batch file skips starting a second control-plane window.
+
 If you prefer to run them manually instead of using the batch file:
 
 ```bash

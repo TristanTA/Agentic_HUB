@@ -1,33 +1,89 @@
 agents:
-  - id: vanta_manager
-    purpose: Primary manager agent for control, task execution, and autonomous operations
-    prompt_file: prompts/agents/vanta_manager.md
-    soul_file: agents/vanta_manager/soul.md
-    loadout_id: vanta_manager_minimal
-    skill_ids: [general_style]
-    allowed_tools: [trace_lookup, file_read, file_write, workspace_note, message_user]
-    preferred_model: openai_gpt5_mini
-    memory_scope: session
-    timeout: 30
-    enabled: true
-    adapter_type: langchain_markdown
-  - id: general_assistant
-    purpose: General fallback assistant
-    prompt_file: prompts/agents/general_assistant.md
-    skill_ids: [general_style]
-    allowed_tools: [workspace_note]
-    preferred_model: echo_model
-    memory_scope: session
-    timeout: 30
-    enabled: true
-    adapter_type: langchain_markdown
-  - id: planner_agent
-    purpose: Break tasks into concrete steps
-    prompt_file: prompts/agents/planner_agent.md
-    skill_ids: [planning_checklist]
-    allowed_tools: [workspace_note]
-    preferred_model: echo_model
-    memory_scope: task
-    timeout: 30
-    enabled: true
-    adapter_type: langchain_markdown
+- id: vanta_manager
+  purpose: Primary manager agent for control, task execution, and autonomous operations
+  prompt_file: prompts/agents/vanta_manager.md
+  soul_file: agents/vanta_manager/soul.md
+  loadout_id: vanta_manager_minimal
+  exposure_mode: standalone_telegram
+  execution_mode: native_hub
+  adapter_type: native
+  adapter_config: {}
+  telegram_profile_id: vanta_manager
+  can_receive_tasks: true
+  can_receive_messages: true
+  telegram:
+    bot_token_env: TELEGRAM_BOT_TOKEN
+    allowed_chat_ids: []
+    owns_polling: true
+  skill_ids:
+  - general_style
+  allowed_tools:
+  - delegate_task
+  - get_task
+  - list_tasks
+  - list_agents
+  - worker_health
+  - trace_lookup
+  - file_read
+  - file_write
+  - workspace_note
+  - message_user
+  preferred_model: openai_gpt5_mini
+  memory_scope: session
+  timeout: 30
+  enabled: true
+- id: general_assistant
+  purpose: General fallback assistant
+  prompt_file: prompts/agents/general_assistant.md
+  exposure_mode: internal_worker
+  execution_mode: native_hub
+  adapter_type: native
+  adapter_config: {}
+  can_receive_tasks: true
+  can_receive_messages: false
+  skill_ids:
+  - general_style
+  allowed_tools:
+  - workspace_note
+  preferred_model: echo_model
+  memory_scope: session
+  timeout: 30
+  enabled: true
+- id: planner_agent
+  purpose: Break tasks into concrete steps
+  prompt_file: prompts/agents/planner_agent.md
+  exposure_mode: internal_worker
+  execution_mode: native_hub
+  adapter_type: native
+  adapter_config: {}
+  can_receive_tasks: true
+  can_receive_messages: false
+  skill_ids:
+  - planning_checklist
+  allowed_tools:
+  - workspace_note
+  preferred_model: echo_model
+  memory_scope: task
+  timeout: 30
+  enabled: true
+- id: test_agent
+  purpose: Testing the create agent wizard and tool
+  prompt_file: prompts/agents/test_agent.md
+  exposure_mode: internal_worker
+  execution_mode: native_hub
+  adapter_type: native
+  adapter_config: {}
+  can_receive_tasks: true
+  can_receive_messages: false
+  skill_ids:
+  - general_style
+  allowed_tools:
+  - trace_lookup
+  - file_read
+  - file_write
+  - workspace_note
+  - message_user
+  preferred_model: openai_gpt5_mini
+  memory_scope: session
+  timeout: 30
+  enabled: true

@@ -7,7 +7,8 @@ from hub.telegram_runner import TelegramBotRunner
 
 
 class StubTelegramOutput:
-    def __init__(self) -> None:
+    def __init__(self, bot_token_env: str = "TELEGRAM_BOT_TOKEN") -> None:
+        self.bot_token_env = bot_token_env
         self.sent: list[dict] = []
         self.actions: list[tuple[str, str]] = []
         self.callback_answers: list[str] = []
@@ -36,15 +37,19 @@ class StubRuntime:
         self.bundle = type(
             "Bundle",
             (),
-            {"hub_config": type("HubCfg", (), {"telegram": type("TelegramCfg", (), {"allowed_chat_ids": []})(), "hub": type("HubInner", (), {"sqlite_path": "data/hub.db"})()})()},
+            {"hub_config": type("HubCfg", (), {"telegram": type("TelegramCfg", (), {"allowed_chat_ids": []})(), "hub": type("HubInner", (), {"sqlite_path": "data/hub.db", "default_agent": "vanta_manager"})()})()},
         )()
-        self.telegram_output = StubTelegramOutput()
         self.reloaded = False
         self.processed: list[str] = []
+        self.direct_processed: list[tuple[str, str]] = []
 
     def process_event(self, event):
         self.processed.append(event.text)
         return {"run_id": "1", "output_text": "ok"}
+
+    def process_event_for_agent(self, event, agent_id: str, output_adapter=None):
+        self.direct_processed.append((agent_id, event.text))
+        return {"run_id": "2", "output_text": "ok"}
 
     def reload_config(self) -> None:
         self.reloaded = True
@@ -92,102 +97,86 @@ class StubWizard:
         return self.next_callback_response
 
 
-def make_runner(tmp_path: Path, control_response: dict | None = None):
+def make_runner(tmp_path: Path, control_response: dict | None = None, target_agent_id: str | None = None):
     runtime = StubRuntime(tmp_path)
     control = StubControlPlane(control_response or {"status": "ok"})
     wizard = StubWizard()
+    output = StubTelegramOutput()
     runner = TelegramBotRunner(
         runtime=runtime,
         control_plane=control,
         wizard=wizard,
+        output=output,
         bot_token="token",
         allowed_chat_ids=set(),
         offset_path=tmp_path / "offset.txt",
+        target_agent_id=target_agent_id,
     )
-    return runner, runtime, control, wizard
+    return runner, runtime, control, wizard, output
 
 
 def test_telegram_runner_routes_commands_to_control_plane(tmp_path: Path):
-    runner, runtime, control, wizard = make_runner(tmp_path, {"status": "reloaded"})
+    runner, runtime, control, wizard, output = make_runner(tmp_path, {"status": "reloaded"})
 
     runner._handle_update(
-        {
-            "update_id": 1,
-            "message": {
-                "message_id": 10,
-                "from": {"id": 456},
-                "chat": {"id": 123},
-                "text": "/reload",
-            },
-        }
+        {"update_id": 1, "message": {"message_id": 10, "from": {"id": 456}, "chat": {"id": 123}, "text": "/reload"}}
     )
 
     assert control.commands == ["/reload"]
     assert runtime.reloaded is True
-    assert runtime.telegram_output.sent[0]["thread_id"] == "123"
+    assert output.sent[0]["thread_id"] == "123"
     assert wizard.started == []
 
 
 def test_telegram_runner_starts_new_agent_wizard(tmp_path: Path):
-    runner, runtime, control, wizard = make_runner(tmp_path)
+    runner, runtime, control, wizard, output = make_runner(tmp_path)
 
     runner._handle_update(
-        {
-            "update_id": 1,
-            "message": {
-                "message_id": 10,
-                "from": {"id": 456},
-                "chat": {"id": 123},
-                "text": "/new_agent",
-            },
-        }
+        {"update_id": 1, "message": {"message_id": 10, "from": {"id": 456}, "chat": {"id": 123}, "text": "/new_agent"}}
     )
 
     assert wizard.started == ["123:456"]
-    assert runtime.telegram_output.sent[0]["text"] == "start wizard"
+    assert output.sent[0]["text"] == "start wizard"
     assert control.commands == []
 
 
 def test_telegram_runner_routes_plain_messages_to_runtime_with_typing(tmp_path: Path):
-    runner, runtime, control, wizard = make_runner(tmp_path)
+    runner, runtime, control, wizard, output = make_runner(tmp_path)
 
     runner._handle_update(
-        {
-            "update_id": 1,
-            "message": {
-                "message_id": 10,
-                "from": {"id": 456},
-                "chat": {"id": 123},
-                "text": "hello vanta",
-            },
-        }
+        {"update_id": 1, "message": {"message_id": 10, "from": {"id": 456}, "chat": {"id": 123}, "text": "hello vanta"}}
     )
 
     assert runtime.processed == ["hello vanta"]
-    assert runtime.telegram_output.actions == [("123", "typing")]
+    assert output.actions == [("123", "typing")]
     assert control.commands == []
 
 
 def test_telegram_runner_handles_wizard_callback_and_reloads_if_needed(tmp_path: Path):
-    runner, runtime, control, wizard = make_runner(tmp_path)
+    runner, runtime, control, wizard, output = make_runner(tmp_path)
     wizard.next_callback_response = StubWizardResponse("created", final_result={"status": "created"})
 
     runner._handle_update(
         {
             "update_id": 1,
-            "callback_query": {
-                "id": "cbq1",
-                "from": {"id": 456},
-                "data": "wizard:new_agent:skills:general_style",
-                "message": {
-                    "message_id": 10,
-                    "chat": {"id": 123},
-                },
-            },
+            "callback_query": {"id": "cbq1", "from": {"id": 456}, "data": "wizard:new_agent:skills:general_style", "message": {"message_id": 10, "chat": {"id": 123}}},
         }
     )
 
     assert wizard.callback_inputs == [("123:456", "wizard:new_agent:skills:general_style")]
-    assert runtime.telegram_output.callback_answers == ["cbq1"]
+    assert output.callback_answers == ["cbq1"]
     assert runtime.reloaded is True
-    assert runtime.telegram_output.sent[0]["text"] == "created"
+    assert output.sent[0]["text"] == "created"
+
+
+def test_direct_agent_runner_bypasses_manager_and_routes_to_target_agent(tmp_path: Path):
+    runner, runtime, control, wizard, output = make_runner(tmp_path, target_agent_id="rowan")
+
+    runner._handle_update(
+        {"update_id": 1, "message": {"message_id": 10, "from": {"id": 456}, "chat": {"id": 123}, "text": "plan my venue shortlist"}}
+    )
+
+    assert runtime.direct_processed == [("rowan", "plan my venue shortlist")]
+    assert control.commands == []
+    assert wizard.started == []
+    assert output.actions == [("123", "typing")]

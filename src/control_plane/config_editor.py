@@ -50,3 +50,22 @@ class ConfigEditor:
         rows.append(item)
         self._write_yaml(path, payload)
         return item
+
+    def upsert_section_item(self, relative_path: str, section: str, item: dict) -> dict:
+        path, payload = self._load_yaml(relative_path)
+        rows = payload.setdefault(section, [])
+        item_id = item.get("id")
+        for existing in rows:
+            if existing.get("id") == item_id:
+                existing.update(item)
+                self._write_yaml(path, payload)
+                return existing
+        rows.append(item)
+        self._write_yaml(path, payload)
+        return item
+
+    def update_yaml_file(self, relative_path: str, updates: dict) -> dict:
+        path, payload = self._load_yaml(relative_path)
+        payload.update(updates)
+        self._write_yaml(path, payload)
+        return payload

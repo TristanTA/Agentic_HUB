@@ -91,6 +91,7 @@ class MessageUserTool:
         text = str(tool_input.get("text", "")).strip()
         if not text:
             return ToolResult(tool_id=self.id, success=False, error="text is required")
+        bot_token_env = str(context.event.metadata.get("bot_token_env", "")).strip()
         relative_path = f"workspace/{context.run_id}/messages_to_user.json"
         path = self.file_repo.write_text(
             relative_path,
@@ -102,7 +103,10 @@ class MessageUserTool:
                 indent=2,
             ),
         )
-        delivery = self.telegram_output.send({"thread_id": context.event.thread_id, "text": text})
+        delivery_adapter = self.telegram_output
+        if bot_token_env:
+            delivery_adapter = TelegramOutputAdapter(enabled=self.telegram_output.enabled, bot_token_env=bot_token_env)
+        delivery = delivery_adapter.send({"thread_id": context.event.thread_id, "text": text})
         return ToolResult(
             tool_id=self.id,
             success=True,
@@ -110,10 +114,81 @@ class MessageUserTool:
         )
 
 
+class DelegateTaskTool:
+    id = "delegate_task"
+
+    def __init__(self, runtime) -> None:
+        self.runtime = runtime
+
+    def invoke(self, context: AgentContext, tool_input: dict) -> ToolResult:
+        assigned_to = str(tool_input.get("assigned_to", "")).strip()
+        goal = str(tool_input.get("goal", "")).strip()
+        input_context = str(tool_input.get("input_context", "")).strip() or goal
+        if not assigned_to or not goal:
+            return ToolResult(tool_id=self.id, success=False, error="assigned_to and goal are required")
+        task = self.runtime.task_service.create_and_dispatch_task(
+            created_by=context.agent_id or "manager",
+            assigned_to=assigned_to,
+            goal=goal,
+            input_context=input_context,
+        )
+        return ToolResult(tool_id=self.id, success=True, output=task.model_dump(mode="json"))
+
+
+class GetTaskTool:
+    id = "get_task"
+
+    def __init__(self, runtime) -> None:
+        self.runtime = runtime
+
+    def invoke(self, context: AgentContext, tool_input: dict) -> ToolResult:
+        task_id = str(tool_input.get("task_id", "")).strip()
+        if not task_id:
+            return ToolResult(tool_id=self.id, success=False, error="task_id is required")
+        task = self.runtime.task_service.get_task(task_id)
+        if task is None:
+            return ToolResult(tool_id=self.id, success=False, error=f"{task_id} not found")
+        return ToolResult(tool_id=self.id, success=True, output=task.model_dump(mode="json"))
+
+
+class ListTasksTool:
+    id = "list_tasks"
+
+    def __init__(self, runtime) -> None:
+        self.runtime = runtime
+
+    def invoke(self, context: AgentContext, tool_input: dict) -> ToolResult:
+        assigned_to = str(tool_input.get("assigned_to", "")).strip() or None
+        created_by = str(tool_input.get("created_by", "")).strip() or None
+        tasks = self.runtime.task_service.list_tasks(assigned_to=assigned_to, created_by=created_by, limit=int(tool_input.get("limit", 20)))
+        return ToolResult(tool_id=self.id, success=True, output={"tasks": [task.model_dump(mode="json") for task in tasks]})
+
+
+class ListAgentsTool:
+    id = "list_agents"
+
+    def __init__(self, runtime) -> None:
+        self.runtime = runtime
+
+    def invoke(self, context: AgentContext, tool_input: dict) -> ToolResult:
+        return ToolResult(tool_id=self.id, success=True, output={"agents": self.runtime.list_agent_profiles()})
+
+
+class WorkerHealthTool:
+    id = "worker_health"
+
+    def __init__(self, runtime) -> None:
+        self.runtime = runtime
+
+    def invoke(self, context: AgentContext, tool_input: dict) -> ToolResult:
+        return ToolResult(tool_id=self.id, success=True, output={"workers": self.runtime.adapters.health_report()})
+
+
 def build_builtin_tools(
     file_repo: FileRepository,
     store: SQLiteStore,
     telegram_output: TelegramOutputAdapter,
+    runtime,
 ) -> dict[str, object]:
     return {
         "workspace_note": WorkspaceNoteTool(file_repo),
@@ -121,4 +196,9 @@ def build_builtin_tools(
         "file_read": FileReadTool(file_repo),
         "file_write": FileWriteTool(file_repo),
         "message_user": MessageUserTool(file_repo, telegram_output),
+        "delegate_task": DelegateTaskTool(runtime),
+        "get_task": GetTaskTool(runtime),
+        "list_tasks": ListTasksTool(runtime),
+        "list_agents": ListAgentsTool(runtime),
+        "worker_health": WorkerHealthTool(runtime),
     }

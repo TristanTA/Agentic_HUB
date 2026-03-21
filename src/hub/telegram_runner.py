@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,6 +11,7 @@ from urllib import error, parse, request
 from control_plane.service import ControlPlaneService
 from control_plane.wizard import TelegramWizardService
 from hub.inputs.normalize import normalize_telegram_payload
+from hub.outputs.telegram import TelegramOutputAdapter
 from hub.runtime.service import HubRuntime
 from storage.sqlite.db import SQLiteStore
 
@@ -19,9 +21,11 @@ class TelegramBotRunner:
     runtime: HubRuntime
     control_plane: ControlPlaneService
     wizard: TelegramWizardService
+    output: TelegramOutputAdapter
     bot_token: str
     allowed_chat_ids: set[str]
     offset_path: Path
+    target_agent_id: str | None = None
 
     def run_forever(self, poll_timeout: int = 30, sleep_seconds: float = 1.0) -> None:
         self.offset_path.parent.mkdir(parents=True, exist_ok=True)
@@ -37,7 +41,7 @@ class TelegramBotRunner:
                 if not updates:
                     time.sleep(sleep_seconds)
             except Exception as exc:
-                self._log_error(f"telegram_runner_error: {type(exc).__name__}: {exc}")
+                self._log_error(f"telegram_runner_error[{self.target_agent_id or 'vanta'}]: {type(exc).__name__}: {exc}")
                 time.sleep(sleep_seconds)
 
     def _handle_update(self, update: dict) -> None:
@@ -47,38 +51,45 @@ class TelegramBotRunner:
             return
 
         event = normalize_telegram_payload(update)
+        event.metadata["bot_token_env"] = self.output.bot_token_env
         thread_id = str(event.thread_id)
         if self.allowed_chat_ids and thread_id not in self.allowed_chat_ids:
+            return
+
+        if self.target_agent_id:
+            self.output.send_chat_action(thread_id, "typing")
+            result = self.runtime.process_event_for_agent(event, self.target_agent_id, output_adapter=self.output)
+            if result.get("status") == "paused":
+                self.output.send({"thread_id": thread_id, "text": "Hub is paused."})
             return
 
         session_key = self._session_key(chat_id=thread_id, user_id=str(update.get("message", {}).get("from", {}).get("id", "")))
         wizard_reply = self.wizard.handle_text(session_key, event.text)
         if wizard_reply is not None:
-            self.runtime.telegram_output.send(
-                {"thread_id": thread_id, "text": wizard_reply.text, "reply_markup": wizard_reply.reply_markup}
-            )
+            self.output.send({"thread_id": thread_id, "text": wizard_reply.text, "reply_markup": wizard_reply.reply_markup})
             return
 
         if event.text.startswith("/"):
             if event.text.split()[0].startswith("/new_agent"):
                 wizard_result = self.wizard.start_new_agent(session_key)
-                self.runtime.telegram_output.send(
-                    {"thread_id": thread_id, "text": wizard_result.text, "reply_markup": wizard_result.reply_markup}
-                )
+                self.output.send({"thread_id": thread_id, "text": wizard_result.text, "reply_markup": wizard_result.reply_markup})
                 return
             result = self.control_plane.handle_management_command(event.text)
-            if result.get("status") in {"created", "reloaded"}:
+            if result.get("status") in {"created", "reloaded", "updated"}:
                 self.runtime.reload_config()
             text = self.control_plane.format_management_result(result)
-            self.runtime.telegram_output.send({"thread_id": thread_id, "text": text})
+            self.output.send({"thread_id": thread_id, "text": text})
             return
 
-        self.runtime.telegram_output.send_chat_action(thread_id, "typing")
+        self.output.send_chat_action(thread_id, "typing")
         result = self.runtime.process_event(event)
         if result.get("status") == "paused":
-            self.runtime.telegram_output.send({"thread_id": thread_id, "text": "Hub is paused."})
+            self.output.send({"thread_id": thread_id, "text": "Hub is paused."})
 
     def _handle_callback_query(self, callback_query: dict) -> None:
+        if self.target_agent_id:
+            self.output.answer_callback_query(callback_query.get("id", ""))
+            return
         callback_id = callback_query.get("id", "")
         message = callback_query.get("message", {})
         chat_id = str(message.get("chat", {}).get("id", ""))
@@ -88,14 +99,12 @@ class TelegramBotRunner:
 
         session_key = self._session_key(chat_id=chat_id, user_id=user_id)
         result = self.wizard.handle_callback(session_key, callback_query.get("data", ""))
-        self.runtime.telegram_output.answer_callback_query(callback_id)
+        self.output.answer_callback_query(callback_id)
         if result is None:
             return
-        if result.final_result and result.final_result.get("status") in {"created", "reloaded"}:
+        if result.final_result and result.final_result.get("status") in {"created", "reloaded", "updated"}:
             self.runtime.reload_config()
-        self.runtime.telegram_output.send(
-            {"thread_id": chat_id, "text": result.text, "reply_markup": result.reply_markup}
-        )
+        self.output.send({"thread_id": chat_id, "text": result.text, "reply_markup": result.reply_markup})
 
     def _get_updates(self, *, offset: int, timeout: int) -> list[dict]:
         query = parse.urlencode({"offset": offset, "timeout": timeout})
@@ -133,8 +142,17 @@ class TelegramBotRunner:
             handle.write(message + "\n")
 
     def _register_commands(self) -> None:
+        if self.target_agent_id:
+            self.output.set_my_commands([{"command": "status", "description": f"Talk to {self.target_agent_id}"}])
+            return
         commands = [
             {"command": "new_agent", "description": "Create a new agent with a guided wizard"},
+            {"command": "agents", "description": "List all registered agents"},
+            {"command": "workers", "description": "List worker-capable agents"},
+            {"command": "tasks", "description": "List active and recent tasks"},
+            {"command": "delegate", "description": "Dispatch a task to a worker"},
+            {"command": "attach_agent", "description": "Attach an external agent profile"},
+            {"command": "promote_agent", "description": "Promote an agent to a new exposure mode"},
             {"command": "status", "description": "Show hub and health status"},
             {"command": "reload", "description": "Reload hub configuration"},
             {"command": "errors", "description": "Show recent runtime errors"},
@@ -142,29 +160,68 @@ class TelegramBotRunner:
             {"command": "resume", "description": "Resume the hub"},
             {"command": "restart", "description": "Restart the hub"},
         ]
-        self.runtime.telegram_output.set_my_commands(commands)
+        self.output.set_my_commands(commands)
 
     def _session_key(self, *, chat_id: str, user_id: str) -> str:
         return f"{chat_id}:{user_id}"
 
 
-def build_runner(runtime: HubRuntime, control_plane: ControlPlaneService) -> TelegramBotRunner:
-    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    if not bot_token:
+def build_runners(runtime: HubRuntime, control_plane: ControlPlaneService) -> list[TelegramBotRunner]:
+    runners: list[TelegramBotRunner] = []
+    main_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    if not main_token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is not configured")
 
+    main_output = TelegramOutputAdapter(enabled=runtime.bundle.hub_config.telegram.enabled, bot_token_env="TELEGRAM_BOT_TOKEN")
     allowed_chat_ids = {
         item.strip()
         for item in runtime.bundle.hub_config.telegram.allowed_chat_ids
         if str(item).strip()
     }
-    offset_path = runtime.root_dir / "data" / "telegram_update_offset.txt"
     wizard = TelegramWizardService(SQLiteStore(runtime.root_dir / runtime.bundle.hub_config.hub.sqlite_path), control_plane.builder)
-    return TelegramBotRunner(
-        runtime=runtime,
-        control_plane=control_plane,
-        wizard=wizard,
-        bot_token=bot_token,
-        allowed_chat_ids=allowed_chat_ids,
-        offset_path=offset_path,
+    runners.append(
+        TelegramBotRunner(
+            runtime=runtime,
+            control_plane=control_plane,
+            wizard=wizard,
+            output=main_output,
+            bot_token=main_token,
+            allowed_chat_ids=allowed_chat_ids,
+            offset_path=runtime.root_dir / "data" / "telegram_update_offset.txt",
+        )
     )
+
+    for spec in runtime.bundle.agents.values():
+        if spec.exposure_mode.value != "standalone_telegram":
+            continue
+        if spec.id == runtime.bundle.hub_config.hub.default_agent:
+            continue
+        bot_token_env = str(spec.telegram.get("bot_token_env", "")).strip()
+        if not bot_token_env or not os.getenv(bot_token_env, "").strip():
+            continue
+        if spec.telegram.get("owns_polling", True) is False:
+            continue
+        output = TelegramOutputAdapter(enabled=True, bot_token_env=bot_token_env)
+        chat_ids = {str(item).strip() for item in spec.telegram.get("allowed_chat_ids", []) if str(item).strip()}
+        runners.append(
+            TelegramBotRunner(
+                runtime=runtime,
+                control_plane=control_plane,
+                wizard=wizard,
+                output=output,
+                bot_token=os.getenv(bot_token_env, "").strip(),
+                allowed_chat_ids=chat_ids,
+                offset_path=runtime.root_dir / "data" / f"{spec.id}_telegram_offset.txt",
+                target_agent_id=spec.id,
+            )
+        )
+    return runners
+
+
+def run_all_runners(runners: list[TelegramBotRunner]) -> None:
+    threads: list[threading.Thread] = []
+    for runner in runners[1:]:
+        thread = threading.Thread(target=runner.run_forever, name=f"telegram-{runner.target_agent_id}", daemon=True)
+        thread.start()
+        threads.append(thread)
+    runners[0].run_forever()

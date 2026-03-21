@@ -30,8 +30,21 @@ class ManagerAgent:
         if command.name == "new_agent":
             return (
                 "Usage: /new_agent <agent_id> --purpose \"What it does\" "
-                "--model <model_id> [--skills skill_a,skill_b] [--tools tool_a,tool_b]"
+                "--model <model_id> [--skills skill_a,skill_b] [--tools tool_a,tool_b] "
+                "[--exposure_mode internal_worker|hub_addressable|standalone_telegram]"
             )
-        if command.name in {"status", "reload", "pause", "resume", "restart", "errors"}:
+        if command.name == "attach_agent":
+            return (
+                "Usage: /attach_agent <agent_id> --purpose \"What it does\" "
+                "--adapter_type <python_process|telegram_bot|openclaw|custom>"
+            )
+        if command.name == "promote_agent":
+            return (
+                "Usage: /promote_agent <agent_id> "
+                "--exposure_mode <internal_worker|hub_addressable|standalone_telegram>"
+            )
+        if command.name == "delegate":
+            return "Usage: /delegate --assigned_to <agent_id> --goal \"What should be done\" [--input_context \"...\"]"
+        if command.name in {"status", "reload", "pause", "resume", "restart", "errors", "agents", "workers", "tasks"}:
             return f"Usage: /{command.name}"
         return f"Unknown management command: /{command.name}"

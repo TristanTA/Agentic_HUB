@@ -1,6 +1,11 @@
 id: vanta_manager_minimal
 description: Minimal high-leverage manager loadout for Vanta
 tools:
+  - delegate_task
+  - get_task
+  - list_tasks
+  - list_agents
+  - worker_health
   - trace_lookup
   - file_read
   - file_write

@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from shared.schemas import ManagementAction, RunTrace
+from shared.schemas import AgentTaskRecord, ManagementAction, RunTrace
 
 
 class SQLiteStore:
@@ -51,6 +51,22 @@ class SQLiteStore:
                     session_key TEXT PRIMARY KEY,
                     state_json TEXT NOT NULL,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS agent_tasks (
+                    task_id TEXT PRIMARY KEY,
+                    created_by TEXT NOT NULL,
+                    assigned_to TEXT NOT NULL,
+                    goal TEXT NOT NULL,
+                    input_context TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    result_summary TEXT NOT NULL,
+                    result_payload_json TEXT NOT NULL,
+                    error TEXT NOT NULL,
+                    artifacts_json TEXT NOT NULL,
+                    adapter_type TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    started_at TEXT,
+                    completed_at TEXT
                 );
                 """
             )
@@ -169,3 +185,110 @@ class SQLiteStore:
     def delete_telegram_session(self, session_key: str) -> None:
         with self._connect() as conn:
             conn.execute("DELETE FROM telegram_sessions WHERE session_key = ?", (session_key,))
+
+    def upsert_agent_task(self, task: AgentTaskRecord) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO agent_tasks (
+                    task_id, created_by, assigned_to, goal, input_context, status,
+                    result_summary, result_payload_json, error, artifacts_json, adapter_type,
+                    created_at, started_at, completed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(task_id) DO UPDATE SET
+                    created_by = excluded.created_by,
+                    assigned_to = excluded.assigned_to,
+                    goal = excluded.goal,
+                    input_context = excluded.input_context,
+                    status = excluded.status,
+                    result_summary = excluded.result_summary,
+                    result_payload_json = excluded.result_payload_json,
+                    error = excluded.error,
+                    artifacts_json = excluded.artifacts_json,
+                    adapter_type = excluded.adapter_type,
+                    created_at = excluded.created_at,
+                    started_at = excluded.started_at,
+                    completed_at = excluded.completed_at
+                """,
+                (
+                    task.task_id,
+                    task.created_by,
+                    task.assigned_to,
+                    task.goal,
+                    task.input_context,
+                    task.status.value,
+                    task.result_summary,
+                    json.dumps(task.result_payload),
+                    task.error,
+                    json.dumps(task.artifacts),
+                    task.adapter_type,
+                    task.created_at.isoformat(),
+                    task.started_at.isoformat() if task.started_at else None,
+                    task.completed_at.isoformat() if task.completed_at else None,
+                ),
+            )
+
+    def get_agent_task(self, task_id: str) -> AgentTaskRecord | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT task_id, created_by, assigned_to, goal, input_context, status,
+                       result_summary, result_payload_json, error, artifacts_json,
+                       adapter_type, created_at, started_at, completed_at
+                FROM agent_tasks
+                WHERE task_id = ?
+                """,
+                (task_id,),
+            ).fetchone()
+        if not row:
+            return None
+        return self._row_to_agent_task(row)
+
+    def list_agent_tasks(
+        self,
+        *,
+        assigned_to: str | None = None,
+        created_by: str | None = None,
+        limit: int = 20,
+    ) -> list[AgentTaskRecord]:
+        clauses: list[str] = []
+        params: list[Any] = []
+        if assigned_to:
+            clauses.append("assigned_to = ?")
+            params.append(assigned_to)
+        if created_by:
+            clauses.append("created_by = ?")
+            params.append(created_by)
+        where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT task_id, created_by, assigned_to, goal, input_context, status,
+                       result_summary, result_payload_json, error, artifacts_json,
+                       adapter_type, created_at, started_at, completed_at
+                FROM agent_tasks
+                {where_sql}
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (*params, limit),
+            ).fetchall()
+        return [self._row_to_agent_task(row) for row in rows]
+
+    def _row_to_agent_task(self, row) -> AgentTaskRecord:
+        return AgentTaskRecord(
+            task_id=row[0],
+            created_by=row[1],
+            assigned_to=row[2],
+            goal=row[3],
+            input_context=row[4],
+            status=row[5],
+            result_summary=row[6],
+            result_payload=json.loads(row[7]),
+            error=row[8],
+            artifacts=json.loads(row[9]),
+            adapter_type=row[10],
+            created_at=row[11],
+            started_at=row[12],
+            completed_at=row[13],
+        )

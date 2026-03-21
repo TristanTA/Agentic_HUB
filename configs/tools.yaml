@@ -84,3 +84,67 @@ tools:
     side_effect_level: low
     permissions: [user_message]
     enabled: true
+  - id: delegate_task
+    description: Create and dispatch a structured task to another agent worker
+    input_schema:
+      type: object
+      properties:
+        assigned_to:
+          type: string
+        goal:
+          type: string
+        input_context:
+          type: string
+    output_schema:
+      type: object
+    side_effect_level: high
+    permissions: [task_dispatch]
+    enabled: true
+  - id: get_task
+    description: Get a structured task by id
+    input_schema:
+      type: object
+      properties:
+        task_id:
+          type: string
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [task_read]
+    enabled: true
+  - id: list_tasks
+    description: List structured tasks
+    input_schema:
+      type: object
+      properties:
+        assigned_to:
+          type: string
+        created_by:
+          type: string
+        limit:
+          type: integer
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [task_read]
+    enabled: true
+  - id: list_agents
+    description: List registered agent profiles
+    input_schema:
+      type: object
+      properties: {}
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [agent_read]
+    enabled: true
+  - id: worker_health
+    description: Inspect worker adapter health
+    input_schema:
+      type: object
+      properties: {}
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [worker_read]
+    enabled: true

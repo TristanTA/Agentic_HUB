@@ -29,6 +29,34 @@ class MatchType(str, Enum):
     FALLBACK = "fallback"
 
 
+class ExposureMode(str, Enum):
+    INTERNAL_WORKER = "internal_worker"
+    HUB_ADDRESSABLE = "hub_addressable"
+    STANDALONE_TELEGRAM = "standalone_telegram"
+
+
+class ExecutionMode(str, Enum):
+    NATIVE_HUB = "native_hub"
+    EXTERNAL_ADAPTER = "external_adapter"
+    EXTERNAL_PASSTHROUGH = "external_passthrough"
+
+
+class AdapterType(str, Enum):
+    NATIVE = "native"
+    PYTHON_PROCESS = "python_process"
+    TELEGRAM_BOT = "telegram_bot"
+    OPENCLAW = "openclaw"
+    CUSTOM = "custom"
+
+
+class TaskStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class NormalizedEvent(BaseModel):
     source: str
     external_id: str
@@ -45,13 +73,20 @@ class AgentSpec(BaseModel):
     prompt_file: str
     soul_file: str | None = None
     loadout_id: str | None = None
+    exposure_mode: ExposureMode = ExposureMode.INTERNAL_WORKER
+    execution_mode: ExecutionMode = ExecutionMode.NATIVE_HUB
+    adapter_type: AdapterType | str = AdapterType.NATIVE
+    adapter_config: dict[str, Any] = Field(default_factory=dict)
+    telegram_profile_id: str | None = None
+    can_receive_tasks: bool = True
+    can_receive_messages: bool = False
+    telegram: dict[str, Any] = Field(default_factory=dict)
     skill_ids: list[str] = Field(default_factory=list)
     allowed_tools: list[str] = Field(default_factory=list)
     preferred_model: str
     memory_scope: str = "session"
     timeout: int = 30
     enabled: bool = True
-    adapter_type: str = "langchain_markdown"
 
 
 class SkillSpec(BaseModel):
@@ -125,6 +160,7 @@ class AgentContext(BaseModel):
     prompt_text: str
     resolved_skills: list[str]
     workspace_path: str
+    agent_id: str | None = None
 
 
 class ToolResult(BaseModel):
@@ -139,6 +175,30 @@ class AgentResult(BaseModel):
     output_text: str
     tool_results: list[ToolResult] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentTaskRecord(BaseModel):
+    task_id: str
+    created_by: str
+    assigned_to: str
+    goal: str
+    input_context: str
+    status: TaskStatus = TaskStatus.QUEUED
+    result_summary: str = ""
+    result_payload: dict[str, Any] = Field(default_factory=dict)
+    error: str = ""
+    artifacts: list[str] = Field(default_factory=list)
+    adapter_type: str = "native"
+    created_at: datetime = Field(default_factory=utc_now)
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+class AdapterHealth(BaseModel):
+    adapter_type: str
+    agent_id: str
+    status: Literal["ok", "degraded", "unavailable"]
+    details: dict[str, Any] = Field(default_factory=dict)
 
 
 class WorkflowResult(BaseModel):

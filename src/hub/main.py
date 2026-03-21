@@ -6,7 +6,7 @@ from pathlib import Path
 from control_plane.service import ControlPlaneService
 from hub.registry.loader import load_registries
 from hub.runtime.service import HubRuntime
-from hub.telegram_runner import build_runner
+from hub.telegram_runner import build_runners, run_all_runners
 from shared.settings import AppSettings
 
 
@@ -22,8 +22,9 @@ def build_runtime(root_dir: str | Path | None = None) -> HubRuntime:
 def main() -> None:
     runtime = build_runtime()
     control_plane = ControlPlaneService(runtime.root_dir)
-    runner = build_runner(runtime, control_plane)
-    runner.run_forever()
+    control_plane.bind_runtime(runtime)
+    runners = build_runners(runtime, control_plane)
+    run_all_runners(runners)
 
 
 if __name__ == "__main__":
