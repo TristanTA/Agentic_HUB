@@ -15,6 +15,17 @@ Agents are configured from YAML, built from Markdown prompts plus Markdown skill
 
 ```bash
 pip install -e .[dev]
+start_hub_and_vanta.bat
+```
+
+The batch file opens two windows:
+
+- the hub runtime, which loads `vanta_manager` from `configs/agents.yaml`
+- the control plane server
+
+If you prefer to run them manually instead of using the batch file:
+
+```bash
 hub-runtime
 hub-control serve
 ```

@@ -9,6 +9,7 @@ src/control_plane/main.py
 src/control_plane/manager_agent.py
 src/control_plane/process_control.py
 src/control_plane/service.py
+src/control_plane/wizard.py
 src/hub/__init__.py
 src/hub/main.py
 src/hub/telegram_runner.py
@@ -57,3 +58,4 @@ tests/test_markdown_workflow.py
 tests/test_router.py
 tests/test_settings.py
 tests/test_telegram_runner.py
+tests/test_wizard.py
