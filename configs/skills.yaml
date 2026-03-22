@@ -9,3 +9,8 @@ skills:
     markdown_file: skills/planning_checklist.md
     description: Encourage explicit plans and checklists.
     enabled: true
+  - id: vanta_operator
+    name: Vanta Operator
+    markdown_file: skills/vanta_operator.md
+    description: Deep operational rigor, autonomous stewardship, and self-improvement for Vanta.
+    enabled: true

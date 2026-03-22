@@ -45,6 +45,14 @@ class ManagerAgent:
             )
         if command.name == "delegate":
             return "Usage: /delegate --assigned_to <agent_id> --goal \"What should be done\" [--input_context \"...\"]"
-        if command.name in {"status", "reload", "pause", "resume", "restart", "errors", "agents", "workers", "tasks"}:
+        if command.name == "trace":
+            return "Usage: /trace <run_id>"
+        if command.name == "logs":
+            return "Usage: /logs [--target hub|telegram] [--lines 20]"
+        if command.name in {"agent", "review_agent", "improve_agent"}:
+            return f"Usage: /{command.name} <agent_id>"
+        if command.name == "rollback_change":
+            return "Usage: /rollback_change <change_id>"
+        if command.name in {"status", "health", "reload", "pause", "resume", "restart", "errors", "routes", "scorecards", "vanta_docs", "vanta_lessons", "vanta_changes", "vanta_status", "vanta_focus", "vanta_review", "vanta_scorecard", "agents", "workers", "tasks"}:
             return f"Usage: /{command.name}"
         return f"Unknown management command: /{command.name}"

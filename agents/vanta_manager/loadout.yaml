@@ -11,7 +11,26 @@ tools:
   - file_write
   - workspace_note
   - message_user
+  - hub_status
+  - recent_errors
+  - trace_inspect
+  - tail_logs
+  - list_routes
+  - agent_inspect
+  - prompt_read
+  - skill_read
+  - agent_update
+  - prompt_update
+  - skill_update
+  - self_context
+  - list_lessons
+  - record_lesson
+  - list_changes
+  - rollback_change
+  - focus_status
 principles:
   - Prefer read before write.
-  - Message the user only when useful.
-  - Keep tool usage minimal.
+  - Improve connected agents before cosmetic changes.
+  - Investigate before intervening.
+  - Learn from failures and weak outcomes.
+  - Message the user when it creates leverage, not just as a reflex.

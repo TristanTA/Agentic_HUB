@@ -89,6 +89,14 @@ class AgentSpec(BaseModel):
     enabled: bool = True
 
 
+class VantaAutonomyConfig(BaseModel):
+    enabled: bool = True
+    interval_seconds: int = 300
+    max_changes_per_cycle: int = 1
+    escalation_threshold: str = "high"
+    self_review_interval_cycles: int = 3
+
+
 class SkillSpec(BaseModel):
     id: str
     name: str
@@ -274,6 +282,7 @@ class HubFileConfig(BaseModel):
     environment: str = "development"
     hub: HubConfig
     telegram: TelegramConfig
+    vanta: VantaAutonomyConfig = Field(default_factory=VantaAutonomyConfig)
 
 
 class ManagementConfig(BaseModel):
@@ -282,3 +291,76 @@ class ManagementConfig(BaseModel):
     audit_actor: str = "operator"
     allow_prompt_edits: bool = True
     allow_skill_edits: bool = True
+
+
+class VantaOwnedDocument(BaseModel):
+    label: str
+    path: str
+
+
+class VantaSelfContext(BaseModel):
+    agent_id: str
+    soul_file: str
+    prompt_file: str
+    config_file: str
+    loadout_file: str
+    registry_file: str
+    owned_documents: list[VantaOwnedDocument] = Field(default_factory=list)
+
+
+class VantaReviewCycle(BaseModel):
+    review_id: str
+    trigger: str = "ambient"
+    focus_area: str
+    summary: str
+    findings: list[str] = Field(default_factory=list)
+    actions_taken: list[str] = Field(default_factory=list)
+    open_concerns: list[str] = Field(default_factory=list)
+    lessons_recorded: list[str] = Field(default_factory=list)
+    status: str = "completed"
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class VantaLesson(BaseModel):
+    lesson_id: str
+    category: str
+    situation: str
+    action_taken: str
+    outcome: str
+    mistake: str
+    updated_rule: str
+    related_review_id: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class AgentScorecard(BaseModel):
+    agent_id: str
+    goal_clarity: int
+    tool_fit: int
+    model_fit: int
+    routing_fit: int
+    completion_quality: int
+    failure_rate: int
+    summary: str
+
+
+class VantaScorecard(BaseModel):
+    diagnosis_quality: int
+    intervention_success_rate: int
+    question_quality: int
+    critique_quality: int
+    repeated_mistake_risk: int
+    self_update_quality: int
+    summary: str
+
+
+class VantaChangeRecord(BaseModel):
+    change_id: str
+    target_type: str
+    target_path: str
+    reason: str
+    previous_content: str
+    new_content: str
+    source: str = "vanta"
+    applied_at: datetime = Field(default_factory=utc_now)
+    rolled_back_at: datetime | None = None

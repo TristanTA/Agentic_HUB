@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from shared.schemas import AgentTaskRecord, ManagementAction, RunTrace
+from shared.schemas import AgentTaskRecord, ManagementAction, RunTrace, VantaChangeRecord, VantaLesson, VantaReviewCycle
 
 
 class SQLiteStore:
@@ -67,6 +67,40 @@ class SQLiteStore:
                     created_at TEXT NOT NULL,
                     started_at TEXT,
                     completed_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS vanta_reviews (
+                    review_id TEXT PRIMARY KEY,
+                    trigger TEXT NOT NULL,
+                    focus_area TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    findings_json TEXT NOT NULL,
+                    actions_taken_json TEXT NOT NULL,
+                    open_concerns_json TEXT NOT NULL,
+                    lessons_recorded_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS vanta_lessons (
+                    lesson_id TEXT PRIMARY KEY,
+                    category TEXT NOT NULL,
+                    situation TEXT NOT NULL,
+                    action_taken TEXT NOT NULL,
+                    outcome TEXT NOT NULL,
+                    mistake TEXT NOT NULL,
+                    updated_rule TEXT NOT NULL,
+                    related_review_id TEXT,
+                    created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS vanta_changes (
+                    change_id TEXT PRIMARY KEY,
+                    target_type TEXT NOT NULL,
+                    target_path TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    previous_content TEXT NOT NULL,
+                    new_content TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    applied_at TEXT NOT NULL,
+                    rolled_back_at TEXT
                 );
                 """
             )
@@ -292,3 +326,190 @@ class SQLiteStore:
             started_at=row[12],
             completed_at=row[13],
         )
+
+    def record_vanta_review(self, review: VantaReviewCycle) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO vanta_reviews (
+                    review_id, trigger, focus_area, summary, findings_json,
+                    actions_taken_json, open_concerns_json, lessons_recorded_json,
+                    status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    review.review_id,
+                    review.trigger,
+                    review.focus_area,
+                    review.summary,
+                    json.dumps(review.findings),
+                    json.dumps(review.actions_taken),
+                    json.dumps(review.open_concerns),
+                    json.dumps(review.lessons_recorded),
+                    review.status,
+                    review.created_at.isoformat(),
+                ),
+            )
+
+    def list_vanta_reviews(self, limit: int = 10) -> list[VantaReviewCycle]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT review_id, trigger, focus_area, summary, findings_json,
+                       actions_taken_json, open_concerns_json, lessons_recorded_json,
+                       status, created_at
+                FROM vanta_reviews
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            VantaReviewCycle(
+                review_id=row[0],
+                trigger=row[1],
+                focus_area=row[2],
+                summary=row[3],
+                findings=json.loads(row[4]),
+                actions_taken=json.loads(row[5]),
+                open_concerns=json.loads(row[6]),
+                lessons_recorded=json.loads(row[7]),
+                status=row[8],
+                created_at=row[9],
+            )
+            for row in rows
+        ]
+
+    def latest_vanta_review(self) -> VantaReviewCycle | None:
+        reviews = self.list_vanta_reviews(limit=1)
+        return reviews[0] if reviews else None
+
+    def record_vanta_lesson(self, lesson: VantaLesson) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO vanta_lessons (
+                    lesson_id, category, situation, action_taken, outcome,
+                    mistake, updated_rule, related_review_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    lesson.lesson_id,
+                    lesson.category,
+                    lesson.situation,
+                    lesson.action_taken,
+                    lesson.outcome,
+                    lesson.mistake,
+                    lesson.updated_rule,
+                    lesson.related_review_id,
+                    lesson.created_at.isoformat(),
+                ),
+            )
+
+    def list_vanta_lessons(self, limit: int = 10) -> list[VantaLesson]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT lesson_id, category, situation, action_taken, outcome,
+                       mistake, updated_rule, related_review_id, created_at
+                FROM vanta_lessons
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            VantaLesson(
+                lesson_id=row[0],
+                category=row[1],
+                situation=row[2],
+                action_taken=row[3],
+                outcome=row[4],
+                mistake=row[5],
+                updated_rule=row[6],
+                related_review_id=row[7],
+                created_at=row[8],
+            )
+            for row in rows
+        ]
+
+    def record_vanta_change(self, change: VantaChangeRecord) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO vanta_changes (
+                    change_id, target_type, target_path, reason, previous_content,
+                    new_content, source, applied_at, rolled_back_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    change.change_id,
+                    change.target_type,
+                    change.target_path,
+                    change.reason,
+                    change.previous_content,
+                    change.new_content,
+                    change.source,
+                    change.applied_at.isoformat(),
+                    change.rolled_back_at.isoformat() if change.rolled_back_at else None,
+                ),
+            )
+
+    def list_vanta_changes(self, limit: int = 10) -> list[VantaChangeRecord]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT change_id, target_type, target_path, reason, previous_content,
+                       new_content, source, applied_at, rolled_back_at
+                FROM vanta_changes
+                ORDER BY applied_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            VantaChangeRecord(
+                change_id=row[0],
+                target_type=row[1],
+                target_path=row[2],
+                reason=row[3],
+                previous_content=row[4],
+                new_content=row[5],
+                source=row[6],
+                applied_at=row[7],
+                rolled_back_at=row[8],
+            )
+            for row in rows
+        ]
+
+    def get_vanta_change(self, change_id: str) -> VantaChangeRecord | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT change_id, target_type, target_path, reason, previous_content,
+                       new_content, source, applied_at, rolled_back_at
+                FROM vanta_changes
+                WHERE change_id = ?
+                """,
+                (change_id,),
+            ).fetchone()
+        if not row:
+            return None
+        return VantaChangeRecord(
+            change_id=row[0],
+            target_type=row[1],
+            target_path=row[2],
+            reason=row[3],
+            previous_content=row[4],
+            new_content=row[5],
+            source=row[6],
+            applied_at=row[7],
+            rolled_back_at=row[8],
+        )
+
+    def mark_vanta_change_rolled_back(self, change_id: str, rolled_back_at: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE vanta_changes SET rolled_back_at = ? WHERE change_id = ?",
+                (rolled_back_at, change_id),
+            )

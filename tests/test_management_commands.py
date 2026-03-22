@@ -73,3 +73,35 @@ def test_delegate_command_dispatches_structured_task(repo_copy):
     assert result["status"] == "ok"
     assert result["task"]["assigned_to"] == "planner_agent"
     assert result["task"]["status"] in {"completed", "failed", "running"}
+
+
+def test_vanta_docs_command_returns_self_model(repo_copy):
+    service = ControlPlaneService(repo_copy)
+    result = service.handle_management_command("/vanta_docs")
+
+    assert result["status"] == "ok"
+    assert result["self"]["agent_id"] == "vanta_manager"
+
+
+def test_agent_command_returns_agent_summary(repo_copy):
+    service = ControlPlaneService(repo_copy)
+    result = service.handle_management_command("/agent vanta_manager")
+
+    assert result["status"] == "ok"
+    assert result["agent"]["id"] == "vanta_manager"
+
+
+def test_scorecards_command_returns_agent_scorecards(repo_copy):
+    service = ControlPlaneService(repo_copy)
+    result = service.handle_management_command("/scorecards")
+
+    assert result["status"] == "ok"
+    assert any(item["agent_id"] == "vanta_manager" for item in result["scorecards"])
+
+
+def test_vanta_focus_command_returns_target(repo_copy):
+    service = ControlPlaneService(repo_copy)
+    result = service.handle_management_command("/vanta_focus")
+
+    assert result["status"] == "ok"
+    assert "target" in result

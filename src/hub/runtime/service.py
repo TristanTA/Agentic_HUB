@@ -15,7 +15,7 @@ from hub.router.router import DeterministicRouter
 from hub.tasks.service import TaskService
 from hub.tools.builtin import build_builtin_tools
 from hub.workflows.executor import WorkflowExecutor
-from shared.schemas import AgentContext, RouteDecision, RunTrace, TargetType
+from shared.schemas import AgentContext, RouteDecision, RunTrace, TargetType, VantaLesson, VantaReviewCycle, VantaSelfContext
 from storage.files.repository import FileRepository
 from storage.sqlite.db import SQLiteStore
 
@@ -210,6 +210,71 @@ class HubRuntime:
                 }
             )
         return sorted(profiles, key=lambda item: item["id"])
+
+    def hub_status(self) -> dict:
+        return {
+            "hub": self.bundle.hub_config.hub.model_dump(),
+            "paused": self.is_paused(),
+            "health": self.store.latest_health() or {"status": "unknown", "details": {}},
+            "default_agent": self.bundle.hub_config.hub.default_agent,
+            "autonomy": self.bundle.hub_config.vanta.model_dump(),
+        }
+
+    def list_routes(self) -> list[dict]:
+        return [rule.model_dump(mode="json") for rule in self.bundle.routes]
+
+    def inspect_agent(self, agent_id: str) -> dict:
+        spec = self.bundle.agents[agent_id]
+        return {
+            "id": spec.id,
+            "purpose": spec.purpose,
+            "prompt_file": spec.prompt_file,
+            "soul_file": spec.soul_file,
+            "loadout_id": spec.loadout_id,
+            "preferred_model": spec.preferred_model,
+            "allowed_tools": spec.allowed_tools,
+            "skill_ids": spec.skill_ids,
+            "exposure_mode": spec.exposure_mode.value,
+            "execution_mode": spec.execution_mode.value,
+            "adapter_type": getattr(spec.adapter_type, "value", spec.adapter_type),
+            "enabled": spec.enabled,
+            "telegram": spec.telegram,
+        }
+
+    def read_prompt_like(self, relative_path: str) -> dict:
+        return {"path": relative_path, "content": self.file_repo.read_text(relative_path)}
+
+    def vanta_self_context(self) -> dict:
+        spec = self.bundle.agents["vanta_manager"]
+        payload = VantaSelfContext(
+            agent_id=spec.id,
+            soul_file=spec.soul_file or "",
+            prompt_file=spec.prompt_file,
+            config_file="agents/vanta_manager/config.yaml",
+            loadout_file="agents/vanta_manager/loadout.yaml",
+            registry_file="configs/agents.yaml",
+            owned_documents=[
+                {"label": "soul", "path": spec.soul_file or ""},
+                {"label": "prompt", "path": spec.prompt_file},
+                {"label": "config", "path": "agents/vanta_manager/config.yaml"},
+                {"label": "loadout", "path": "agents/vanta_manager/loadout.yaml"},
+                {"label": "registry", "path": "configs/agents.yaml"},
+            ],
+        )
+        return payload.model_dump(mode="json")
+
+    def record_vanta_review(self, review: VantaReviewCycle) -> None:
+        self.store.record_vanta_review(review)
+
+    def latest_vanta_review(self) -> dict | None:
+        review = self.store.latest_vanta_review()
+        return review.model_dump(mode="json") if review else None
+
+    def list_vanta_lessons(self, limit: int = 10) -> list[dict]:
+        return [lesson.model_dump(mode="json") for lesson in self.store.list_vanta_lessons(limit=limit)]
+
+    def record_vanta_lesson(self, lesson: VantaLesson) -> None:
+        self.store.record_vanta_lesson(lesson)
 
     def _execute(self, decision: RouteDecision, context: AgentContext) -> str:
         if decision.target_type == TargetType.AGENT:

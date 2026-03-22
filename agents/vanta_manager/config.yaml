@@ -14,9 +14,9 @@ telegram:
   bot_token_env: TELEGRAM_BOT_TOKEN
   allowed_chat_ids: []
   owns_polling: true
-preferred_model: openai_gpt5_mini
 skill_ids:
   - general_style
+  - vanta_operator
 allowed_tools:
   - delegate_task
   - get_task
@@ -28,6 +28,24 @@ allowed_tools:
   - file_write
   - workspace_note
   - message_user
+  - hub_status
+  - recent_errors
+  - trace_inspect
+  - tail_logs
+  - list_routes
+  - agent_inspect
+  - prompt_read
+  - skill_read
+  - agent_update
+  - prompt_update
+  - skill_update
+  - self_context
+  - list_lessons
+  - record_lesson
+  - list_changes
+  - rollback_change
+  - focus_status
 memory_scope: session
-timeout: 30
+preferred_model: openai_gpt5_vanta
+timeout: 90
 enabled: true

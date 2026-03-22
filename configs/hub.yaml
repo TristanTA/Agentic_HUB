@@ -13,3 +13,9 @@ telegram:
   enabled: true
   bot_token_env: TELEGRAM_BOT_TOKEN
   allowed_chat_ids: []
+vanta:
+  enabled: true
+  interval_seconds: 300
+  max_changes_per_cycle: 1
+  escalation_threshold: high
+  self_review_interval_cycles: 3

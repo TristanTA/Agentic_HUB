@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 
 from control_plane.service import ControlPlaneService
 from hub.registry.loader import load_registries
 from hub.runtime.service import HubRuntime
+from hub.runtime.vanta_operator import VantaOperator
 from hub.telegram_runner import build_runners, run_all_runners
 from shared.settings import AppSettings
 
@@ -21,8 +23,12 @@ def build_runtime(root_dir: str | Path | None = None) -> HubRuntime:
 
 def main() -> None:
     runtime = build_runtime()
+    operator = VantaOperator(runtime)
     control_plane = ControlPlaneService(runtime.root_dir)
     control_plane.bind_runtime(runtime)
+    if runtime.bundle.hub_config.vanta.enabled:
+        thread = threading.Thread(target=operator.run_forever, name="vanta-operator", daemon=True)
+        thread.start()
     runners = build_runners(runtime, control_plane)
     run_all_runners(runners)
 

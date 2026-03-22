@@ -148,3 +148,223 @@ tools:
     side_effect_level: none
     permissions: [worker_read]
     enabled: true
+  - id: hub_status
+    description: Inspect hub state, health, default agent, and Vanta autonomy config
+    input_schema:
+      type: object
+      properties: {}
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [hub_read]
+    enabled: true
+  - id: recent_errors
+    description: Inspect recent runtime errors without using management commands
+    input_schema:
+      type: object
+      properties:
+        limit:
+          type: integer
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [trace_read]
+    enabled: true
+  - id: trace_inspect
+    description: Inspect a run trace in structured form
+    input_schema:
+      type: object
+      properties:
+        run_id:
+          type: string
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [trace_read]
+    enabled: true
+  - id: tail_logs
+    description: Tail recent hub or Telegram log lines
+    input_schema:
+      type: object
+      properties:
+        target:
+          type: string
+        lines:
+          type: integer
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [log_read]
+    enabled: true
+  - id: list_routes
+    description: List the active routing rules
+    input_schema:
+      type: object
+      properties: {}
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [route_read]
+    enabled: true
+  - id: agent_inspect
+    description: Inspect one agent's model, tools, skills, and exposure
+    input_schema:
+      type: object
+      properties:
+        agent_id:
+          type: string
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [agent_read]
+    enabled: true
+  - id: prompt_read
+    description: Read a prompt file directly or by agent id
+    input_schema:
+      type: object
+      properties:
+        path:
+          type: string
+        agent_id:
+          type: string
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [repo_read]
+    enabled: true
+  - id: skill_read
+    description: Read a skill file by skill id
+    input_schema:
+      type: object
+      properties:
+        skill_id:
+          type: string
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [repo_read]
+    enabled: true
+  - id: agent_update
+    description: Apply a structured update to an agent config entry
+    input_schema:
+      type: object
+      properties:
+        agent_id:
+          type: string
+        updates:
+          type: object
+    output_schema:
+      type: object
+    side_effect_level: high
+    permissions: [agent_write]
+    enabled: true
+  - id: prompt_update
+    description: Update a prompt or soul markdown file through the control plane
+    input_schema:
+      type: object
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+    output_schema:
+      type: object
+    side_effect_level: high
+    permissions: [repo_write]
+    enabled: true
+  - id: skill_update
+    description: Update a skill markdown file through the control plane
+    input_schema:
+      type: object
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+    output_schema:
+      type: object
+    side_effect_level: high
+    permissions: [repo_write]
+    enabled: true
+  - id: self_context
+    description: Return Vanta's owned documents and identity metadata
+    input_schema:
+      type: object
+      properties: {}
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [self_read]
+    enabled: true
+  - id: list_lessons
+    description: List Vanta's recent lessons from weak outcomes or failures
+    input_schema:
+      type: object
+      properties:
+        limit:
+          type: integer
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [lesson_read]
+    enabled: true
+  - id: record_lesson
+    description: Record a structured lesson for Vanta's self-improvement loop
+    input_schema:
+      type: object
+      properties:
+        lesson_id:
+          type: string
+        category:
+          type: string
+        situation:
+          type: string
+        action_taken:
+          type: string
+        outcome:
+          type: string
+        mistake:
+          type: string
+        updated_rule:
+          type: string
+        related_review_id:
+          type: string
+    output_schema:
+      type: object
+    side_effect_level: low
+    permissions: [lesson_write]
+    enabled: true
+  - id: list_changes
+    description: List Vanta's tracked prompt, skill, and config changes
+    input_schema:
+      type: object
+      properties:
+        limit:
+          type: integer
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [change_read]
+    enabled: true
+  - id: rollback_change
+    description: Roll back one tracked Vanta change by id
+    input_schema:
+      type: object
+      properties:
+        change_id:
+          type: string
+    output_schema:
+      type: object
+    side_effect_level: high
+    permissions: [change_write]
+    enabled: true
+  - id: focus_status
+    description: Return Vanta's current highest-leverage focus and target
+    input_schema:
+      type: object
+      properties: {}
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [focus_read]
+    enabled: true

@@ -180,3 +180,16 @@ def test_direct_agent_runner_bypasses_manager_and_routes_to_target_agent(tmp_pat
     assert control.commands == []
     assert wizard.started == []
     assert output.actions == [("123", "typing")]
+
+
+def test_telegram_runner_registers_vanta_ops_commands(tmp_path: Path):
+    runner, runtime, control, wizard, output = make_runner(tmp_path)
+
+    runner._register_commands()
+
+    commands = {item["command"] for item in output.commands_registered[0]}
+    assert "vanta_status" in commands
+    assert "vanta_docs" in commands
+    assert "review_agent" in commands
+    assert "vanta_focus" in commands
+    assert "rollback_change" in commands

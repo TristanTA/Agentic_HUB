@@ -32,7 +32,9 @@ hub-runtime
 hub-control serve
 ```
 
-The Telegram adapter is a placeholder in V1. It normalizes inbound payloads but does not yet maintain a live bot connection.
+Telegram is now part chat surface, part operator console. It supports direct agent messaging, management commands, and Vanta introspection commands while a live bot runner polls for updates.
+
+Vanta also has an ambient operator loop that can review hub health, agent effectiveness, and recent lessons even when no one is actively chatting with her.
 
 ## Migrating an existing agent
 

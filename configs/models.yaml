@@ -5,7 +5,15 @@ models:
     timeout: 60
     defaults:
       reasoning:
-        effort: low
+        effort: medium
+    enabled: true
+  - id: openai_gpt5_vanta
+    provider: openai
+    model_name: gpt-5-mini
+    timeout: 90
+    defaults:
+      reasoning:
+        effort: high
     enabled: true
   - id: echo_model
     provider: local
