@@ -14,7 +14,7 @@ agents:
   telegram:
     bot_token_env: TELEGRAM_BOT_TOKEN
     allowed_chat_ids: []
-    owns_polling: true
+    owns_polling: false
   skill_ids:
   - general_style
   - vanta_operator
