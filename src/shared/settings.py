@@ -29,6 +29,14 @@ class AppSettings:
         return self.root_dir / "prompts"
 
     @property
+    def agent_specs_dir(self) -> Path:
+        return self.root_dir / "agent_specs"
+
+    @property
+    def generated_dir(self) -> Path:
+        return self.root_dir / "generated"
+
+    @property
     def skills_dir(self) -> Path:
         return self.root_dir / "skills"
 
@@ -52,6 +60,8 @@ class AppSettings:
         for path in [
             self.config_dir,
             self.data_dir,
+            self.agent_specs_dir,
+            self.generated_dir,
             self.logs_dir,
             self.prompts_dir,
             self.skills_dir,

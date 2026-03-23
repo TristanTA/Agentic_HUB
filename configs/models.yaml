@@ -9,7 +9,7 @@ models:
     enabled: true
   - id: openai_gpt5_vanta
     provider: openai
-    model_name: gpt-5-mini
+    model_name: gpt-5.2
     timeout: 90
     defaults:
       reasoning:

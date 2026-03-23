@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-03-23T06:18:10.391623Z",
+  "agents": [
+    {
+      "id": "echo_worker",
+      "purpose": "Handle one simple worker execution path for smoke testing and early v0 tasks.",
+      "role": "executor",
+      "interface": "internal",
+      "model_id": "echo_model",
+      "tool_profile": "minimal",
+      "skill_profile": "general",
+      "system_prompt": "You are echo_worker.\nPurpose: Handle one simple worker execution path for smoke testing and early v0 tasks.\nRole: executor\nInterface: internal\nOperate directly and concisely.\nReturn useful output without unnecessary commentary.",
+      "permissions": []
+    }
+  ]
+}

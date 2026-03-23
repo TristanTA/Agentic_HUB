@@ -49,6 +49,52 @@ class AdapterType(str, Enum):
     CUSTOM = "custom"
 
 
+class AgentRole(str, Enum):
+    SUPERVISOR = "supervisor"
+    EXECUTOR = "executor"
+    PLANNER = "planner"
+    RESEARCHER = "researcher"
+    OPERATOR = "operator"
+    DIRECT_FACING = "direct_facing"
+    EXTERNAL_WRAPPER = "external_wrapper"
+
+
+class AgentInterface(str, Enum):
+    INTERNAL = "internal"
+    TELEGRAM = "telegram"
+    ADDRESSABLE = "addressable"
+
+
+class AgentLifecycleStatus(str, Enum):
+    DRAFT = "draft"
+    VALIDATED = "validated"
+    ACTIVE = "active"
+    DEGRADED = "degraded"
+    BROKEN = "broken"
+    DISABLED = "disabled"
+
+
+class ModelProfile(str, Enum):
+    STRONG = "strong"
+    BALANCED = "balanced"
+    CHEAP = "cheap"
+
+
+class ToolProfile(str, Enum):
+    MINIMAL = "minimal"
+    OPERATOR = "operator"
+    PLANNER = "planner"
+    MESSAGING = "messaging"
+    SUPERVISOR = "supervisor"
+
+
+class SkillProfile(str, Enum):
+    GENERAL = "general"
+    PLANNING = "planning"
+    OPERATOR = "operator"
+    SUPERVISOR = "supervisor"
+
+
 class TaskStatus(str, Enum):
     QUEUED = "queued"
     RUNNING = "running"
@@ -286,6 +332,49 @@ class HubFileConfig(BaseModel):
     hub: HubConfig
     telegram: TelegramConfig
     vanta: VantaAutonomyConfig = Field(default_factory=VantaAutonomyConfig)
+
+
+class AgentDefinitionSpec(BaseModel):
+    id: str
+    purpose: str
+    role: AgentRole = AgentRole.EXECUTOR
+    interface: AgentInterface = AgentInterface.INTERNAL
+    execution_mode: ExecutionMode = ExecutionMode.NATIVE_HUB
+    model_profile: ModelProfile = ModelProfile.BALANCED
+    tool_profile: ToolProfile = ToolProfile.MINIMAL
+    skill_profile: SkillProfile = SkillProfile.GENERAL
+    permissions: list[str] = Field(default_factory=list)
+    status: AgentLifecycleStatus = AgentLifecycleStatus.DRAFT
+    autonomy_level: str = "bounded"
+    operating_style: str = ""
+    telegram: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class AgentValidationReport(BaseModel):
+    agent_id: str
+    valid: bool
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    status_after_validation: AgentLifecycleStatus = AgentLifecycleStatus.DRAFT
+
+
+class RuntimeAgentEntry(BaseModel):
+    id: str
+    purpose: str
+    role: AgentRole
+    interface: AgentInterface
+    model_id: str
+    tool_profile: ToolProfile
+    skill_profile: SkillProfile
+    system_prompt: str
+    permissions: list[str] = Field(default_factory=list)
+
+
+class RuntimeRegistrySnapshot(BaseModel):
+    generated_at: datetime = Field(default_factory=utc_now)
+    agents: list[RuntimeAgentEntry] = Field(default_factory=list)
 
 
 class ManagementConfig(BaseModel):
