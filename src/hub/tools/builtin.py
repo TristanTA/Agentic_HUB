@@ -446,6 +446,62 @@ class FocusTool:
         return ToolResult(tool_id=self.id, success=True, output=control.vanta_focus())
 
 
+class MemorySearchTool:
+    id = "memory_search"
+
+    def __init__(self, runtime) -> None:
+        self.runtime = runtime
+
+    def invoke(self, context: AgentContext, tool_input: dict) -> ToolResult:
+        control = getattr(self.runtime, "control_plane", None)
+        if control is None:
+            return ToolResult(tool_id=self.id, success=False, error="control plane is not bound")
+        query = str(tool_input.get("query", "")).strip()
+        if not query:
+            return ToolResult(tool_id=self.id, success=False, error="query is required")
+        return ToolResult(tool_id=self.id, success=True, output=control.memory_search(query=query, limit=int(tool_input.get("limit", 8))))
+
+
+class TriageTool:
+    id = "triage_request"
+
+    def __init__(self, runtime) -> None:
+        self.runtime = runtime
+
+    def invoke(self, context: AgentContext, tool_input: dict) -> ToolResult:
+        control = getattr(self.runtime, "control_plane", None)
+        if control is None:
+            return ToolResult(tool_id=self.id, success=False, error="control plane is not bound")
+        text = str(tool_input.get("text", "")).strip() or context.event.text
+        return ToolResult(tool_id=self.id, success=True, output=control.suggest_specialist(text))
+
+
+class ConsolidationTool:
+    id = "consolidation_report"
+
+    def __init__(self, runtime) -> None:
+        self.runtime = runtime
+
+    def invoke(self, context: AgentContext, tool_input: dict) -> ToolResult:
+        control = getattr(self.runtime, "control_plane", None)
+        if control is None:
+            return ToolResult(tool_id=self.id, success=False, error="control plane is not bound")
+        return ToolResult(tool_id=self.id, success=True, output=control.consolidate_vanta())
+
+
+class DigestTool:
+    id = "vanta_digest"
+
+    def __init__(self, runtime) -> None:
+        self.runtime = runtime
+
+    def invoke(self, context: AgentContext, tool_input: dict) -> ToolResult:
+        control = getattr(self.runtime, "control_plane", None)
+        if control is None:
+            return ToolResult(tool_id=self.id, success=False, error="control plane is not bound")
+        return ToolResult(tool_id=self.id, success=True, output=control.vanta_digest())
+
+
 def build_builtin_tools(
     file_repo: FileRepository,
     store: SQLiteStore,
@@ -480,4 +536,8 @@ def build_builtin_tools(
         "list_changes": ListChangesTool(runtime),
         "rollback_change": RollbackChangeTool(runtime),
         "focus_status": FocusTool(runtime),
+        "memory_search": MemorySearchTool(runtime),
+        "triage_request": TriageTool(runtime),
+        "consolidation_report": ConsolidationTool(runtime),
+        "vanta_digest": DigestTool(runtime),
     }

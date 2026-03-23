@@ -11,5 +11,7 @@ def test_load_registries(repo_copy):
     assert "hub_system_map" in bundle.skills
     assert bundle.hub_config.hub.default_agent == "vanta_manager"
     assert bundle.hub_config.vanta.enabled is True
+    assert "configs/models.yaml" in bundle.hub_config.vanta.protected_paths
     assert "self_context" in bundle.tools
+    assert "memory_search" in bundle.tools
     assert bundle.agents["vanta_manager"].preferred_model == "openai_gpt5_vanta"

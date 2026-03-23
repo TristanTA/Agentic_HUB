@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from hub.inputs.normalize import normalize_telegram_payload
 from hub.main import build_runtime
+from shared.schemas import RouteDecision, TargetType
 
 
 def test_vanta_session_memory_carries_recent_thread_context(repo_copy):
@@ -16,10 +17,21 @@ def test_vanta_session_memory_carries_recent_thread_context(repo_copy):
     second = normalize_telegram_payload(
         {"message": {"message_id": 2, "chat": {"id": thread_id}, "text": "The budget is 15k."}}
     )
-    result = runtime.process_event_for_agent(second, "vanta_manager", output_adapter=runtime.telegram_output.__class__(enabled=False))
+    runtime.process_event_for_agent(second, "vanta_manager", output_adapter=runtime.telegram_output.__class__(enabled=False))
+    context = runtime._build_context(
+        "test-run",
+        second,
+        RouteDecision(
+            matched_rule="direct:vanta_manager",
+            target_type=TargetType.AGENT,
+            target_id="vanta_manager",
+            reason="test",
+            config_version="v1",
+        ),
+    )
 
-    assert "wedding venue shortlist" in result["output_text"]
-    assert "The budget is 15k." in result["output_text"]
+    assert "wedding venue shortlist" in context.conversation_history
+    assert "The budget is 15k." in context.conversation_history
 
 
 def test_vanta_stores_preference_and_working_state(repo_copy):

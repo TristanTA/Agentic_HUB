@@ -10,6 +10,7 @@ from urllib import error, parse, request
 class TelegramOutputAdapter:
     enabled: bool = True
     bot_token_env: str = "TELEGRAM_BOT_TOKEN"
+    max_message_length: int = 4000
 
     def send(self, output_event: dict) -> dict:
         if not self.enabled:
@@ -24,11 +25,16 @@ class TelegramOutputAdapter:
             return {"status": "skipped", "reason": "missing_thread_id"}
         if not text:
             return {"status": "skipped", "reason": "missing_text"}
-
-        payload = {"chat_id": chat_id, "text": text}
-        if output_event.get("reply_markup") is not None:
-            payload["reply_markup"] = json.dumps(output_event["reply_markup"])
-        return self._post_form(bot_token, "sendMessage", payload)
+        chunks = self._chunk_text(text)
+        responses = []
+        for index, chunk in enumerate(chunks):
+            payload = {"chat_id": chat_id, "text": chunk}
+            if index == 0 and output_event.get("reply_markup") is not None:
+                payload["reply_markup"] = json.dumps(output_event["reply_markup"])
+            responses.append(self._post_form(bot_token, "sendMessage", payload))
+        if len(responses) == 1:
+            return responses[0]
+        return {"status": "sent", "adapter": "telegram", "chunks": len(responses), "responses": responses}
 
     def send_chat_action(self, thread_id: str, action: str = "typing") -> dict:
         if not self.enabled:
@@ -74,3 +80,19 @@ class TelegramOutputAdapter:
             return {"status": "error", "reason": f"telegram_network_{exc.reason}", "method": method}
 
         return {"status": "sent", "adapter": "telegram", "method": method, "payload": response_payload}
+
+    def _chunk_text(self, text: str) -> list[str]:
+        value = str(text or "").strip()
+        if len(value) <= self.max_message_length:
+            return [value]
+        chunks: list[str] = []
+        remaining = value
+        while len(remaining) > self.max_message_length:
+            split_at = remaining.rfind("\n", 0, self.max_message_length)
+            if split_at <= 0:
+                split_at = self.max_message_length
+            chunks.append(remaining[:split_at].strip())
+            remaining = remaining[split_at:].strip()
+        if remaining:
+            chunks.append(remaining)
+        return chunks

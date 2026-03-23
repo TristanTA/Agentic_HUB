@@ -191,10 +191,14 @@ class HubRuntime:
             conversation_history = "\n".join(f"{item['role'].upper()}: {item['text']}" for item in history)
         system_context = self._system_context(agent_id)
         memory_context = self._memory_context(agent_id=agent_id, thread_id=event.thread_id)
+        retrieval_context = self._retrieval_context(agent_id=agent_id, query=event.text)
         working_state = self.store.get_thread_working_state(thread_id=event.thread_id, agent_id=agent_id)
         if memory_context:
             system_context = f"{system_context}\n" if system_context else ""
             system_context += memory_context
+        if retrieval_context:
+            system_context = f"{system_context}\n" if system_context else ""
+            system_context += retrieval_context
         if working_state is not None:
             system_context = f"{system_context}\n" if system_context else ""
             system_context += self._format_working_state(working_state)
@@ -268,6 +272,14 @@ class HubRuntime:
         if facts:
             blocks.append("Stored Facts:\n" + "\n".join(f"- {item.value}" for item in facts))
         return "\n".join(blocks)
+
+    def _retrieval_context(self, *, agent_id: str, query: str) -> str:
+        if agent_id != "vanta_manager":
+            return ""
+        results = self.store.search_memory(agent_id=agent_id, query=query, limit=5)
+        if not results:
+            return ""
+        return "Relevant Retrieved Memory:\n" + "\n".join(f"- [{item.source_type}] {item.text}" for item in results)
 
     def _format_working_state(self, state: ThreadWorkingState) -> str:
         return "\n".join(

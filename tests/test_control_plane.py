@@ -57,3 +57,14 @@ def test_edit_prompt_records_change_and_can_be_rolled_back(repo_copy):
 
     assert rollback["status"] == "ok"
     assert (repo_copy / "prompts" / "agents" / "vanta_manager.md").read_text(encoding="utf-8") == original
+
+
+def test_protected_path_rejects_direct_prompt_edit(repo_copy):
+    service = ControlPlaneService(repo_copy)
+
+    try:
+        service.edit_prompt("configs/models.yaml", "bad")
+    except ValueError as exc:
+        assert "Protected path" in str(exc)
+    else:
+        raise AssertionError("Expected protected path edit to fail")

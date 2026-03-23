@@ -193,3 +193,5 @@ def test_telegram_runner_registers_vanta_ops_commands(tmp_path: Path):
     assert "review_agent" in commands
     assert "vanta_focus" in commands
     assert "rollback_change" in commands
+    assert "vanta_digest" in commands
+    assert "memory_search" in commands

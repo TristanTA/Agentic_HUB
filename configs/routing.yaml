@@ -6,6 +6,13 @@ routes:
     target_type: agent
     target_id: planner_agent
     reason: Planning keywords route to planner agent
+  - id: testing_keyword_route
+    match:
+      type: contains_any
+      values: [test, verify, pytest, failing]
+    target_type: agent
+    target_id: test_agent
+    reason: Testing and verification keywords route to test_agent
   - id: fallback_general
     match:
       type: fallback

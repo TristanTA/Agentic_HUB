@@ -117,24 +117,27 @@ class ControlPlaneService:
         return trace
 
     def edit_prompt(self, relative_path: str, content: str) -> dict:
+        self._assert_path_edit_allowed(relative_path)
         previous_content = self.file_repo.read_text(relative_path) if (self.root_dir / relative_path).exists() else ""
         path = self.editor.edit_markdown(relative_path, content)
-        change = self._record_vanta_change("prompt", relative_path, previous_content, content, "Prompt update")
+        change = self._record_vanta_change("prompt", relative_path, previous_content, content, "Prompt update", severity="medium")
         self._audit("edit_prompt", relative_path, {}, "updated")
         return {"path": str(path), "change_id": change.change_id}
 
     def edit_agent_config(self, agent_id: str, updates: dict) -> dict:
+        self._assert_path_edit_allowed("configs/agents.yaml")
         previous_content = (self.root_dir / "configs" / "agents.yaml").read_text(encoding="utf-8")
         updated = self.editor.update_section_item("configs/agents.yaml", "agents", agent_id, updates)
         new_content = (self.root_dir / "configs" / "agents.yaml").read_text(encoding="utf-8")
-        self._record_vanta_change("agent_config", "configs/agents.yaml", previous_content, new_content, f"Agent config update for {agent_id}")
+        self._record_vanta_change("agent_config", "configs/agents.yaml", previous_content, new_content, f"Agent config update for {agent_id}", severity="high")
         self._audit("edit_agent_config", agent_id, updates, "updated")
         return updated
 
     def edit_skill(self, relative_path: str, content: str) -> dict:
+        self._assert_path_edit_allowed(relative_path)
         previous_content = self.file_repo.read_text(relative_path) if (self.root_dir / relative_path).exists() else ""
         path = self.editor.edit_markdown(relative_path, content)
-        change = self._record_vanta_change("skill", relative_path, previous_content, content, "Skill update")
+        change = self._record_vanta_change("skill", relative_path, previous_content, content, "Skill update", severity="medium")
         self._audit("edit_skill", relative_path, {}, "updated")
         return {"path": str(path), "change_id": change.change_id}
 
@@ -146,11 +149,18 @@ class ControlPlaneService:
     def manager_summary(self) -> dict:
         return self.manager_agent.summarize_operational_risk()
 
-    def _record_vanta_change(self, target_type: str, target_path: str, previous_content: str, new_content: str, reason: str) -> VantaChangeRecord:
+    def _assert_path_edit_allowed(self, relative_path: str) -> None:
+        normalized = str(relative_path).replace("\\", "/")
+        protected = {path.replace("\\", "/") for path in self.bundle.hub_config.vanta.protected_paths}
+        if normalized in protected and normalized not in {"configs/agents.yaml"}:
+            raise ValueError(f"Protected path requires a dedicated flow: {normalized}")
+
+    def _record_vanta_change(self, target_type: str, target_path: str, previous_content: str, new_content: str, reason: str, *, severity: str = "medium") -> VantaChangeRecord:
         change = VantaChangeRecord(
             change_id=str(uuid.uuid4()),
             target_type=target_type,
             target_path=target_path,
+            severity=severity,
             reason=reason,
             previous_content=previous_content,
             new_content=new_content,
@@ -161,6 +171,9 @@ class ControlPlaneService:
     def vanta_changes(self, limit: int = 10) -> dict:
         return {"status": "ok", "changes": [change.model_dump(mode="json") for change in self.store.list_vanta_changes(limit=limit)]}
 
+    def memory_search(self, query: str, limit: int = 8) -> dict:
+        return {"status": "ok", "results": [item.model_dump(mode="json") for item in self.store.search_memory(agent_id="vanta_manager", query=query, limit=limit)]}
+
     def vanta_memory(self, thread_id: str | None = None) -> dict:
         agent_id = "vanta_manager"
         memories = self.store.list_memory_items(agent_id=agent_id, thread_id=thread_id, limit=20)
@@ -170,6 +183,49 @@ class ControlPlaneService:
             "memory_items": [item.model_dump(mode="json") for item in memories],
             "working_state": state.model_dump(mode="json") if state else None,
         }
+
+    def suggest_specialist(self, text: str) -> dict:
+        lowered = str(text).lower()
+        for rule in self.bundle.routes:
+            if rule.match.type.value == "contains_any" and any(token.lower() in lowered for token in rule.match.values):
+                return {"status": "ok", "agent_id": rule.target_id, "reason": rule.reason}
+        if any(token in lowered for token in ["test", "verify", "pytest"]):
+            return {"status": "ok", "agent_id": "test_agent", "reason": "Testing-related request fits the test agent."}
+        if any(token in lowered for token in ["plan", "roadmap", "strategy"]):
+            return {"status": "ok", "agent_id": "planner_agent", "reason": "Planning-oriented request fits planner_agent."}
+        return {"status": "ok", "agent_id": "vanta_manager", "reason": "No better specialist match was found."}
+
+    def vanta_digest(self) -> dict:
+        latest_review = self.store.latest_vanta_review()
+        latest_changes = self.store.list_vanta_changes(limit=3)
+        latest_lessons = self.store.list_vanta_lessons(limit=3)
+        focus = self.vanta_focus()
+        return {
+            "status": "ok",
+            "focus": focus,
+            "latest_review": latest_review.model_dump(mode="json") if latest_review else None,
+            "changes": [item.model_dump(mode="json") for item in latest_changes],
+            "lessons": [item.model_dump(mode="json") for item in latest_lessons],
+        }
+
+    def consolidate_vanta(self) -> dict:
+        paths = [
+            "agents/vanta_manager/soul.md",
+            "prompts/agents/vanta_manager.md",
+            "skills/vanta_operator.md",
+            "skills/hub_system_map.md",
+            "skills/delegation_discipline.md",
+        ]
+        texts = {path: self.file_repo.read_text(path) for path in paths if (self.root_dir / path).exists()}
+        repeated = []
+        seen: dict[str, str] = {}
+        for path, content in texts.items():
+            for line in [item.strip() for item in content.splitlines() if item.strip().startswith("- ")]:
+                if line in seen and seen[line] != path:
+                    repeated.append(f"{line} repeated in {seen[line]} and {path}")
+                else:
+                    seen[line] = path
+        return {"status": "ok", "duplicates": repeated[:20], "paths": list(texts)}
 
     def rollback_change(self, change_id: str) -> dict:
         change = self.store.get_vanta_change(change_id)
@@ -454,14 +510,28 @@ class ControlPlaneService:
             return self.vanta_changes(limit=int(command.options.get("limit", "10")))
         if command.name == "vanta_memory":
             return self.vanta_memory(thread_id=command.options.get("thread_id"))
+        if command.name == "memory_search":
+            query = command.options.get("query") or (" ".join(command.args).strip())
+            if not query:
+                return {"status": "needs_input", "command": command.name, "message": "Usage: /memory_search --query <text>"}
+            return self.memory_search(query=query, limit=int(command.options.get("limit", "8")))
         if command.name == "vanta_status":
             return self.vanta_status()
         if command.name == "vanta_focus":
             return self.vanta_focus()
+        if command.name == "vanta_digest":
+            return self.vanta_digest()
         if command.name == "vanta_scorecard":
             return self.vanta_scorecard()
         if command.name == "vanta_review":
             return self.vanta_review()
+        if command.name == "triage":
+            text = command.options.get("text") or (" ".join(command.args).strip())
+            if not text:
+                return {"status": "needs_input", "command": command.name, "message": "Usage: /triage --text <request>"}
+            return self.suggest_specialist(text)
+        if command.name == "consolidate_vanta":
+            return self.consolidate_vanta()
         if command.name == "scorecards":
             return self.agent_scorecards()
         if command.name == "rollback_change":
@@ -650,12 +720,15 @@ class ControlPlaneService:
             changes = result["changes"]
             if not changes:
                 return "No Vanta changes recorded."
-            return "\n".join(f"{item['change_id']} | {item['target_path']} | {item['reason']}" for item in changes[:5])
+            return "\n".join(f"{item['change_id']} | {item['severity']} | {item['target_path']} | {item['reason']}" for item in changes[:5])
         if "memory_items" in result:
             memory_lines = [f"{item['kind']}: {item['value']}" for item in result["memory_items"][:8]]
             state = result.get("working_state")
             state_line = f"Working state: {state}" if state else "Working state: none"
             return "\n".join(memory_lines + [state_line]) if memory_lines else state_line
+        if "results" in result:
+            rows = result["results"]
+            return "\n".join(f"{item['source_type']} | score={item['score']} | {item['text']}" for item in rows) or "No matching memory."
         if "last_review" in result or "current_focus" in result:
             recent = result.get("recent_changes", [])
             recent_summary = ", ".join(item["change_id"] for item in recent) if recent else "none"
@@ -668,6 +741,13 @@ class ControlPlaneService:
             )
         if "focus_area" in result and "target" in result:
             return f"Focus: {result['focus_area']}\nTarget: {result['target']}\nReason: {result['reason']}"
+        if "focus" in result and "changes" in result and "lessons" in result:
+            return (
+                f"Focus: {result['focus'].get('target', '')}\n"
+                f"Changes: {len(result['changes'])}\n"
+                f"Lessons: {len(result['lessons'])}\n"
+                f"Latest review: {result.get('latest_review', {})}"
+            )
         if "scorecards" in result:
             return "\n".join(
                 f"{item['agent_id']} | model={item['model_fit']} | tools={item['tool_fit']} | completion={item['completion_quality']}"
@@ -678,6 +758,10 @@ class ControlPlaneService:
             if "agent_id" in scorecard:
                 return f"{scorecard['agent_id']} | {scorecard['summary']}"
             return scorecard["summary"]
+        if result.get("agent_id") and result.get("reason"):
+            return f"Suggested specialist: {result['agent_id']}\nReason: {result['reason']}"
+        if "duplicates" in result:
+            return "\n".join(result["duplicates"]) or "No obvious duplicated instruction lines found."
         if result.get("change_id") and result.get("target_path"):
             return f"Rolled back {result['change_id']} -> {result['target_path']}"
         if "review" in result:
@@ -741,6 +825,10 @@ def build_app(root_dir: Path) -> FastAPI:
     @app.get("/vanta-lessons")
     def vanta_lessons():
         return service.vanta_lessons()
+
+    @app.get("/vanta-digest")
+    def vanta_digest():
+        return service.vanta_digest()
 
     @app.post("/agents/{agent_id}")
     def edit_agent(agent_id: str, updates: dict):

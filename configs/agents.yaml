@@ -48,6 +48,10 @@ agents:
   - list_changes
   - rollback_change
   - focus_status
+  - memory_search
+  - triage_request
+  - consolidation_report
+  - vanta_digest
   preferred_model: openai_gpt5_vanta
   memory_scope: session
   timeout: 90

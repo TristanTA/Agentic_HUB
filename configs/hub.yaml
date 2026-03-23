@@ -19,3 +19,7 @@ vanta:
   max_changes_per_cycle: 1
   escalation_threshold: high
   self_review_interval_cycles: 3
+  protected_paths:
+    - configs/agents.yaml
+    - configs/models.yaml
+    - configs/tools.yaml

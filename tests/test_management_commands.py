@@ -5,6 +5,7 @@ import yaml
 from control_plane.commands import parse_management_command
 from control_plane.service import ControlPlaneService
 from hub.main import build_runtime
+from shared.schemas import MemoryItem
 
 
 def test_parse_management_command_supports_args_and_options():
@@ -113,3 +114,33 @@ def test_vanta_memory_command_returns_memory_state(repo_copy):
 
     assert result["status"] == "ok"
     assert "memory_items" in result
+
+
+def test_memory_search_and_triage_commands(repo_copy):
+    service = ControlPlaneService(repo_copy)
+    service.store.upsert_memory_item(
+        MemoryItem(
+            memory_id="m1",
+            scope="user_preference",
+            key="pref",
+            value="Challenge me hard on strategy choices.",
+            kind="preference",
+            agent_id="vanta_manager",
+        )
+    )
+
+    search = service.handle_management_command('/memory_search --query "strategy challenge"')
+    triage = service.handle_management_command('/triage --text "please plan a launch roadmap"')
+
+    assert search["status"] == "ok"
+    assert search["results"]
+    assert triage["status"] == "ok"
+    assert triage["agent_id"] == "planner_agent"
+
+
+def test_vanta_digest_command_returns_summary(repo_copy):
+    service = ControlPlaneService(repo_copy)
+    result = service.handle_management_command("/vanta_digest")
+
+    assert result["status"] == "ok"
+    assert "focus" in result

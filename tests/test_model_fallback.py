@@ -15,3 +15,22 @@ def test_echo_fallback_does_not_dump_langchain_message_repr(repo_copy, monkeypat
 
     assert "HumanMessage(content=" not in result["output_text"]
     assert "plan a launch roadmap for Aria" in result["output_text"]
+
+
+def test_echo_fallback_extracts_current_input_not_full_prompt(repo_copy, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    runtime = build_runtime(repo_copy)
+    event = normalize_telegram_payload(
+        {
+            "message": {
+                "message_id": 2,
+                "chat": {"id": "321"},
+                "text": "Heres the info for aria:\n1. What is Aria?\nA hands-on digital band manager.",
+            }
+        }
+    )
+
+    result = runtime.process_event(event)
+
+    assert result["output_text"].startswith("[gpt-5-mini] Heres the info for aria:")
+    assert "# Planner Agent" not in result["output_text"]

@@ -95,6 +95,7 @@ class VantaAutonomyConfig(BaseModel):
     max_changes_per_cycle: int = 1
     escalation_threshold: str = "high"
     self_review_interval_cycles: int = 3
+    protected_paths: list[str] = Field(default_factory=lambda: ["configs/agents.yaml", "configs/models.yaml", "configs/tools.yaml"])
 
 
 class SkillSpec(BaseModel):
@@ -314,6 +315,7 @@ class VantaReviewCycle(BaseModel):
     review_id: str
     trigger: str = "ambient"
     focus_area: str
+    severity: str = "medium"
     summary: str
     findings: list[str] = Field(default_factory=list)
     actions_taken: list[str] = Field(default_factory=list)
@@ -360,6 +362,7 @@ class VantaChangeRecord(BaseModel):
     change_id: str
     target_type: str
     target_path: str
+    severity: str = "medium"
     reason: str
     previous_content: str
     new_content: str
@@ -390,3 +393,10 @@ class ThreadWorkingState(BaseModel):
     resolved_information: list[str] = Field(default_factory=list)
     next_step: str = ""
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MemorySearchResult(BaseModel):
+    source_type: str
+    source_id: str
+    text: str
+    score: int

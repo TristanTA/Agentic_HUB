@@ -47,6 +47,10 @@ allowed_tools:
   - list_changes
   - rollback_change
   - focus_status
+  - memory_search
+  - triage_request
+  - consolidation_report
+  - vanta_digest
 memory_scope: session
 preferred_model: openai_gpt5_vanta
 timeout: 90

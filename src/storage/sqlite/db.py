@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from shared.schemas import AgentTaskRecord, ManagementAction, MemoryItem, RunTrace, ThreadWorkingState, VantaChangeRecord, VantaLesson, VantaReviewCycle
+from shared.schemas import AgentTaskRecord, ManagementAction, MemoryItem, MemorySearchResult, RunTrace, ThreadWorkingState, VantaChangeRecord, VantaLesson, VantaReviewCycle
 
 
 class SQLiteStore:
@@ -72,6 +72,7 @@ class SQLiteStore:
                     review_id TEXT PRIMARY KEY,
                     trigger TEXT NOT NULL,
                     focus_area TEXT NOT NULL,
+                    severity TEXT NOT NULL DEFAULT 'medium',
                     summary TEXT NOT NULL,
                     findings_json TEXT NOT NULL,
                     actions_taken_json TEXT NOT NULL,
@@ -95,6 +96,7 @@ class SQLiteStore:
                     change_id TEXT PRIMARY KEY,
                     target_type TEXT NOT NULL,
                     target_path TEXT NOT NULL,
+                    severity TEXT NOT NULL DEFAULT 'medium',
                     reason TEXT NOT NULL,
                     previous_content TEXT NOT NULL,
                     new_content TEXT NOT NULL,
@@ -134,6 +136,15 @@ class SQLiteStore:
                 );
                 """
             )
+            self._ensure_column(conn, "vanta_reviews", "severity", "TEXT NOT NULL DEFAULT 'medium'")
+            self._ensure_column(conn, "vanta_changes", "severity", "TEXT NOT NULL DEFAULT 'medium'")
+            self._ensure_column(conn, "vanta_changes", "evaluated_at", "TEXT")
+            self._ensure_column(conn, "vanta_changes", "evaluation_note", "TEXT NOT NULL DEFAULT ''")
+
+    def _ensure_column(self, conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+        columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     def write_run_trace(self, trace: RunTrace) -> None:
         with self._connect() as conn:
@@ -362,15 +373,16 @@ class SQLiteStore:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO vanta_reviews (
-                    review_id, trigger, focus_area, summary, findings_json,
+                    review_id, trigger, focus_area, severity, summary, findings_json,
                     actions_taken_json, open_concerns_json, lessons_recorded_json,
                     status, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     review.review_id,
                     review.trigger,
                     review.focus_area,
+                    review.severity,
                     review.summary,
                     json.dumps(review.findings),
                     json.dumps(review.actions_taken),
@@ -385,7 +397,7 @@ class SQLiteStore:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT review_id, trigger, focus_area, summary, findings_json,
+                SELECT review_id, trigger, focus_area, severity, summary, findings_json,
                        actions_taken_json, open_concerns_json, lessons_recorded_json,
                        status, created_at
                 FROM vanta_reviews
@@ -399,13 +411,14 @@ class SQLiteStore:
                 review_id=row[0],
                 trigger=row[1],
                 focus_area=row[2],
-                summary=row[3],
-                findings=json.loads(row[4]),
-                actions_taken=json.loads(row[5]),
-                open_concerns=json.loads(row[6]),
-                lessons_recorded=json.loads(row[7]),
-                status=row[8],
-                created_at=row[9],
+                severity=row[3],
+                summary=row[4],
+                findings=json.loads(row[5]),
+                actions_taken=json.loads(row[6]),
+                open_concerns=json.loads(row[7]),
+                lessons_recorded=json.loads(row[8]),
+                status=row[9],
+                created_at=row[10],
             )
             for row in rows
         ]
@@ -468,14 +481,15 @@ class SQLiteStore:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO vanta_changes (
-                    change_id, target_type, target_path, reason, previous_content,
+                    change_id, target_type, target_path, severity, reason, previous_content,
                     new_content, source, applied_at, rolled_back_at, evaluated_at, evaluation_note
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     change.change_id,
                     change.target_type,
                     change.target_path,
+                    change.severity,
                     change.reason,
                     change.previous_content,
                     change.new_content,
@@ -491,7 +505,7 @@ class SQLiteStore:
         with self._connect() as conn:
             rows = conn.execute(
                 """
-                SELECT change_id, target_type, target_path, reason, previous_content,
+                SELECT change_id, target_type, target_path, severity, reason, previous_content,
                        new_content, source, applied_at, rolled_back_at, evaluated_at, evaluation_note
                 FROM vanta_changes
                 ORDER BY applied_at DESC
@@ -504,14 +518,15 @@ class SQLiteStore:
                 change_id=row[0],
                 target_type=row[1],
                 target_path=row[2],
-                reason=row[3],
-                previous_content=row[4],
-                new_content=row[5],
-                source=row[6],
-                applied_at=row[7],
-                rolled_back_at=row[8],
-                evaluated_at=row[9],
-                evaluation_note=row[10],
+                severity=row[3],
+                reason=row[4],
+                previous_content=row[5],
+                new_content=row[6],
+                source=row[7],
+                applied_at=row[8],
+                rolled_back_at=row[9],
+                evaluated_at=row[10],
+                evaluation_note=row[11],
             )
             for row in rows
         ]
@@ -520,7 +535,7 @@ class SQLiteStore:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT change_id, target_type, target_path, reason, previous_content,
+                SELECT change_id, target_type, target_path, severity, reason, previous_content,
                        new_content, source, applied_at, rolled_back_at, evaluated_at, evaluation_note
                 FROM vanta_changes
                 WHERE change_id = ?
@@ -533,14 +548,15 @@ class SQLiteStore:
             change_id=row[0],
             target_type=row[1],
             target_path=row[2],
-            reason=row[3],
-            previous_content=row[4],
-            new_content=row[5],
-            source=row[6],
-            applied_at=row[7],
-            rolled_back_at=row[8],
-            evaluated_at=row[9],
-            evaluation_note=row[10],
+            severity=row[3],
+            reason=row[4],
+            previous_content=row[5],
+            new_content=row[6],
+            source=row[7],
+            applied_at=row[8],
+            rolled_back_at=row[9],
+            evaluated_at=row[10],
+            evaluation_note=row[11],
         )
 
     def mark_vanta_change_rolled_back(self, change_id: str, rolled_back_at: str) -> None:
@@ -682,3 +698,28 @@ class SQLiteStore:
             next_step=row[6],
             updated_at=row[7],
         )
+
+    def search_memory(self, *, agent_id: str, query: str, limit: int = 8) -> list[MemorySearchResult]:
+        tokens = {token.lower() for token in str(query).split() if len(token.strip()) > 2}
+        candidates: list[MemorySearchResult] = []
+        for item in self.list_memory_items(agent_id=agent_id, limit=50):
+            score = sum(1 for token in tokens if token in item.value.lower() or token in item.key.lower())
+            if score:
+                candidates.append(MemorySearchResult(source_type=item.kind, source_id=item.memory_id, text=item.value, score=score))
+        for lesson in self.list_vanta_lessons(limit=30):
+            text = f"{lesson.situation} {lesson.updated_rule} {lesson.mistake}"
+            score = sum(1 for token in tokens if token in text.lower())
+            if score:
+                candidates.append(MemorySearchResult(source_type="lesson", source_id=lesson.lesson_id, text=lesson.updated_rule, score=score))
+        for review in self.list_vanta_reviews(limit=20):
+            text = f"{review.summary} {' '.join(review.findings)} {' '.join(review.open_concerns)}"
+            score = sum(1 for token in tokens if token in text.lower())
+            if score:
+                candidates.append(MemorySearchResult(source_type="review", source_id=review.review_id, text=review.summary, score=score))
+        for change in self.list_vanta_changes(limit=20):
+            text = f"{change.reason} {change.target_path} {change.evaluation_note}"
+            score = sum(1 for token in tokens if token in text.lower())
+            if score:
+                candidates.append(MemorySearchResult(source_type="change", source_id=change.change_id, text=change.reason, score=score))
+        candidates.sort(key=lambda item: item.score, reverse=True)
+        return candidates[:limit]

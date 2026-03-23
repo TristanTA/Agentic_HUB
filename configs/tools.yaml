@@ -368,3 +368,49 @@ tools:
     side_effect_level: none
     permissions: [focus_read]
     enabled: true
+  - id: memory_search
+    description: Search Vanta's long-term memory, lessons, reviews, and changes
+    input_schema:
+      type: object
+      properties:
+        query:
+          type: string
+        limit:
+          type: integer
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [memory_read]
+    enabled: true
+  - id: triage_request
+    description: Suggest the best specialist agent for a request after triage
+    input_schema:
+      type: object
+      properties:
+        text:
+          type: string
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [route_read]
+    enabled: true
+  - id: consolidation_report
+    description: Report duplicated or drifting instruction lines across Vanta docs
+    input_schema:
+      type: object
+      properties: {}
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [repo_read]
+    enabled: true
+  - id: vanta_digest
+    description: Return a compact digest of focus, recent changes, lessons, and review status
+    input_schema:
+      type: object
+      properties: {}
+    output_schema:
+      type: object
+    side_effect_level: none
+    permissions: [digest_read]
+    enabled: true

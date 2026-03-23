@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from urllib import error, request
 
 from langchain_core.runnables import RunnableLambda
@@ -147,15 +148,36 @@ class ModelRegistry:
 
     def _coerce_payload_to_text(self, payload, *, prefer_latest_message: bool = False) -> str:
         if isinstance(payload, str):
-            return payload
+            return self._extract_user_facing_text(payload, prefer_latest_message=prefer_latest_message)
         if isinstance(payload, dict):
-            return payload.get("input") or payload.get("text") or json.dumps(payload)
+            text = payload.get("input") or payload.get("text") or json.dumps(payload)
+            return self._extract_user_facing_text(text, prefer_latest_message=prefer_latest_message)
         if prefer_latest_message and hasattr(payload, "to_messages"):
             messages = payload.to_messages()
             if messages:
-                return str(messages[-1].content)
+                return self._extract_user_facing_text(str(messages[-1].content), prefer_latest_message=True)
         if hasattr(payload, "to_string"):
-            return payload.to_string()
+            return self._extract_user_facing_text(payload.to_string(), prefer_latest_message=prefer_latest_message)
         if hasattr(payload, "to_messages"):
-            return "\n".join(str(message.content) for message in payload.to_messages())
-        return str(payload)
+            return self._extract_user_facing_text(
+                "\n".join(str(message.content) for message in payload.to_messages()),
+                prefer_latest_message=prefer_latest_message,
+            )
+        return self._extract_user_facing_text(str(payload), prefer_latest_message=prefer_latest_message)
+
+    def _extract_user_facing_text(self, text: str, *, prefer_latest_message: bool = False) -> str:
+        value = str(text or "")
+        if not prefer_latest_message:
+            return value
+
+        patterns = [
+            r"Current Input:\s*(.*)$",
+            r"User/Input:\s*(.*)$",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, value, flags=re.DOTALL)
+            if match:
+                extracted = match.group(1).strip()
+                if extracted:
+                    return extracted
+        return value
