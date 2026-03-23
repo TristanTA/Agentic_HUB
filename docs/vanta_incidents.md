@@ -1064,3 +1064,555 @@ Sanitized incident history for Telegram-visible failures and recovery diagnostic
 - Failure type: RuntimeError
 - Last action: run_forever
 - State: incident_active
+## 2026-03-23T18:54:05.387131+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:07.233032+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:09.051988+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:10.900057+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:12.781974+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:14.554999+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:16.339816+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:18.172515+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:20.005351+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:21.871450+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:23.722506+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:25.455828+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:27.298876+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:29.029160+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:30.981254+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:32.752495+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:34.470597+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:36.230220+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:37.958763+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:39.822714+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:41.663514+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:43.489457+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:45.326202+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:47.191706+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:48.996644+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:50.711235+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:52.468543+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:54.342882+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:56.212175+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:58.026517+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:54:59.865292+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:01.691139+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:03.569541+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:05.392983+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:07.235187+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:09.073257+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:10.881423+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:12.549572+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:14.276930+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:15.987683+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:17.799213+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:19.611684+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:21.369095+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:23.225023+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:25.072654+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:26.869213+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:28.530137+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:30.266656+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:31.963465+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:33.757890+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:35.616966+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:37.443160+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:39.269076+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:41.045821+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:42.858178+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:44.711277+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:46.559943+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:48.397680+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:50.224300+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:52.083946+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:53.926036+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:55.665103+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:57.542796+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:55:59.373245+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:01.203049+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:03.026990+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:04.888740+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:06.725425+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:08.586602+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:10.406311+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:12.257226+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:14.085952+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:15.948606+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:17.865905+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:19.735782+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:21.692618+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:23.526891+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:25.367355+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:27.239253+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:28.957369+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:30.685178+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:32.430940+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:34.171883+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:35.863138+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:37.594386+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:39.333197+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:41.145013+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:42.880271+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:44.608847+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:46.303674+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:48.034114+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T18:56:49.757037+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
