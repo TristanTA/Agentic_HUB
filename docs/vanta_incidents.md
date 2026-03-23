@@ -986,3 +986,81 @@ Sanitized incident history for Telegram-visible failures and recovery diagnostic
 - Failure type: RuntimeError
 - Last action: run_forever
 - State: incident_active
+## 2026-03-23T06:31:32.780119+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T06:31:34.631941+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T06:31:36.563970+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T06:31:38.543384+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T06:31:40.383357+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T06:31:42.289969+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T06:31:44.076469+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T06:31:45.888809+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T06:31:47.791685+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T06:31:49.550659+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T06:31:51.247461+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T06:31:53.013008+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
+## 2026-03-23T06:31:54.888123+00:00 | high | vanta_core
+- Summary: Telegram polling failure: RuntimeError
+- Likely cause: Telegram getUpdates failed (401): {"ok":false,"error_code":401,"description":"Unauthorized"}
+- Failure type: RuntimeError
+- Last action: run_forever
+- State: incident_active
