@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib import error, request
 
-from control_plane.commands import parse_management_command
+from shared.commands import parse_management_command
 from shared.schemas import VantaIncident
 from specs.service import AgentSpecService
 from storage.sqlite.db import SQLiteStore

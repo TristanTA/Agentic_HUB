@@ -5,7 +5,7 @@ import os
 import time
 from pathlib import Path
 
-from hub.models.providers import ModelRegistry
+from shared.model_registry import ModelRegistry
 from shared.schemas import ModelSpec
 from specs.service import AgentSpecService
 from storage.sqlite.db import SQLiteStore

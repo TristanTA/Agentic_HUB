@@ -21,8 +21,6 @@ dependencies = [
 dev = ["pytest>=8.0.0"]
 
 [project.scripts]
-hub-runtime = "hub.main:main"
-hub-control = "control_plane.main:main"
 agent-os = "agent_os.main:main"
 vanta-core = "vanta_core.main:main"
 

@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib import error, parse, request
 
-from hub.inputs.normalize import normalize_telegram_payload
-from hub.outputs.telegram import TelegramOutputAdapter
+from shared.telegram_input import normalize_telegram_payload
+from shared.telegram_output import TelegramOutputAdapter
 from storage.sqlite.db import SQLiteStore
 from vanta_core.interview import AgentInterviewService
 from vanta_core.service import VantaCoreService

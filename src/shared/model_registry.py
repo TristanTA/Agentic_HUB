@@ -25,90 +25,13 @@ class ModelRegistry:
 
         return RunnableLambda(invoke)
 
-    def supports_function_tools(self, model_id: str) -> bool:
-        return self.models[model_id].provider == "openai" and bool(os.getenv("OPENAI_API_KEY", "").strip())
-
-    def run_with_tools(
-        self,
-        *,
-        model_id: str,
-        system_prompt: str,
-        user_input: str,
-        tools: list[dict],
-        tool_executor,
-        max_rounds: int = 8,
-    ) -> str:
-        spec = self.models[model_id]
-        if spec.provider != "openai":
-            return self._coerce_payload_to_text(user_input)
-        if not os.getenv("OPENAI_API_KEY", "").strip():
-            return self._coerce_payload_to_text(user_input)
-
-        response = self._post_openai_response(
-            spec,
-            {
-                "model": spec.model_name,
-                "instructions": system_prompt,
-                "input": user_input,
-                "tools": tools,
-                "parallel_tool_calls": False,
-                **spec.defaults,
-            },
-        )
-        rounds = 0
-        while rounds < max_rounds:
-            function_calls = [
-                item for item in response.get("output", []) if item.get("type") == "function_call"
-            ]
-            if not function_calls:
-                break
-
-            tool_outputs = []
-            for call in function_calls:
-                raw_args = call.get("arguments") or "{}"
-                try:
-                    parsed_args = json.loads(raw_args)
-                except json.JSONDecodeError:
-                    parsed_args = {}
-                result = tool_executor(call.get("name", ""), parsed_args)
-                tool_outputs.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": call.get("call_id"),
-                        "output": json.dumps(result),
-                    }
-                )
-
-            response = self._post_openai_response(
-                spec,
-                {
-                    "model": spec.model_name,
-                    "instructions": system_prompt,
-                    "previous_response_id": response.get("id"),
-                    "input": tool_outputs,
-                    "tools": tools,
-                    "parallel_tool_calls": False,
-                    **spec.defaults,
-                },
-            )
-            rounds += 1
-
-        return self._extract_output_text(response)
-
     def _invoke_openai(self, spec: ModelSpec, payload) -> str:
         api_key = os.getenv("OPENAI_API_KEY", "").strip()
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY is not configured")
 
         text = self._coerce_payload_to_text(payload)
-        payload = self._post_openai_response(
-            spec,
-            {
-                "model": spec.model_name,
-                "input": text,
-                **spec.defaults,
-            },
-        )
+        payload = self._post_openai_response(spec, {"model": spec.model_name, "input": text, **spec.defaults})
         return self._extract_output_text(payload)
 
     def _post_openai_response(self, spec: ModelSpec, body: dict) -> dict:
@@ -119,10 +42,7 @@ class ModelRegistry:
         req = request.Request(
             "https://api.openai.com/v1/responses",
             data=json.dumps(body).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             method="POST",
         )
         try:
@@ -169,12 +89,7 @@ class ModelRegistry:
         value = str(text or "")
         if not prefer_latest_message:
             return value
-
-        patterns = [
-            r"Current Input:\s*(.*)$",
-            r"User/Input:\s*(.*)$",
-        ]
-        for pattern in patterns:
+        for pattern in [r"Current Input:\s*(.*)$", r"User/Input:\s*(.*)$"]:
             match = re.search(pattern, value, flags=re.DOTALL)
             if match:
                 extracted = match.group(1).strip()

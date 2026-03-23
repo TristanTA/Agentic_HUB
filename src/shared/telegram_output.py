@@ -36,25 +36,6 @@ class TelegramOutputAdapter:
             return responses[0]
         return {"status": "sent", "adapter": "telegram", "chunks": len(responses), "responses": responses}
 
-    def send_chat_action(self, thread_id: str, action: str = "typing") -> dict:
-        if not self.enabled:
-            return {"status": "disabled", "adapter": "telegram"}
-        bot_token = os.getenv(self.bot_token_env, "").strip()
-        if not bot_token:
-            return {"status": "skipped", "reason": "missing_bot_token"}
-        return self._post_form(bot_token, "sendChatAction", {"chat_id": thread_id, "action": action})
-
-    def answer_callback_query(self, callback_query_id: str, text: str = "") -> dict:
-        if not self.enabled:
-            return {"status": "disabled", "adapter": "telegram"}
-        bot_token = os.getenv(self.bot_token_env, "").strip()
-        if not bot_token:
-            return {"status": "skipped", "reason": "missing_bot_token"}
-        payload = {"callback_query_id": callback_query_id}
-        if text:
-            payload["text"] = text
-        return self._post_form(bot_token, "answerCallbackQuery", payload)
-
     def set_my_commands(self, commands: list[dict[str, str]]) -> dict:
         if not self.enabled:
             return {"status": "disabled", "adapter": "telegram"}
@@ -65,11 +46,7 @@ class TelegramOutputAdapter:
 
     def _post_form(self, bot_token: str, method: str, payload: dict[str, str]) -> dict:
         data = parse.urlencode(payload).encode("utf-8")
-        req = request.Request(
-            f"https://api.telegram.org/bot{bot_token}/{method}",
-            data=data,
-            method="POST",
-        )
+        req = request.Request(f"https://api.telegram.org/bot{bot_token}/{method}", data=data, method="POST")
         try:
             with request.urlopen(req, timeout=30) as response:
                 response_payload = json.loads(response.read().decode("utf-8"))
@@ -78,7 +55,6 @@ class TelegramOutputAdapter:
             return {"status": "error", "reason": f"telegram_http_{exc.code}", "detail": detail, "method": method}
         except error.URLError as exc:
             return {"status": "error", "reason": f"telegram_network_{exc.reason}", "method": method}
-
         return {"status": "sent", "adapter": "telegram", "method": method, "payload": response_payload}
 
     def _chunk_text(self, text: str) -> list[str]:

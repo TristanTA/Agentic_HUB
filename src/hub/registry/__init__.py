@@ -1,1 +1,0 @@
-"""Registry loading and validation."""

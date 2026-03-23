@@ -1,48 +1,42 @@
-# Personal AI Hub
+# Vanta OS
 
-Personal AI Hub is a self-hosted orchestration repo for running personal agents behind one local runtime while keeping management and recovery outside that runtime.
+Vanta OS is a fresh rebuild centered on an ultra-robust Vanta supervisor and a minimal Agent OS runtime.
 
 ## Architecture
 
-The system has two independent processes:
+The system has two new layers:
 
-- `hub`: receives inputs, routes deterministically, executes LangChain-built agents/tools/workflows, and writes traces.
-- `control_plane`: supervises the hub, reads logs/configs directly, edits prompts and skills, and handles pause/resume/restart even when the hub is unhealthy.
+- `vanta_core`: the always-on supervisor that owns Telegram operations, provider checks, incident reporting, agent visibility, validation, activation, and runtime recovery.
+- `agent_os`: a small worker runtime that loads only active validated agents from generated runtime registry data.
 
-Agents are configured from YAML, built from Markdown prompts plus Markdown skill packs, and can hand work to each other through hub-managed Markdown task/result files.
+Canonical agent definitions live in `agent_specs/`. Those specs are the source of truth. The runtime registry in `generated/` is derived from them.
 
-## Run locally
+## Start The System
 
-```bash
-pip install -e .[dev]
-start_hub_and_vanta.bat
+Use the single launcher:
+
+```bat
+start_vanta_os.bat
 ```
 
-The batch file opens two windows:
+That starts Vanta Core, and Vanta Core supervises Agent OS from there.
 
-- the hub runtime, which loads `vanta_manager` from `configs/agents.yaml`
-- the control plane server
+## Telegram Commands
 
-If port `8011` is already in use, the batch file skips starting a second control-plane window.
+Vanta v1 exposes a compact operator surface:
 
-If you prefer to run them manually instead of using the batch file:
-
-```bash
-hub-runtime
-hub-control serve
-```
-
-Telegram is now part chat surface, part operator console. It supports direct agent messaging, management commands, and Vanta introspection commands while a live bot runner polls for updates.
-
-Vanta also has an ambient operator loop that can review hub health, agent effectiveness, and recent lessons even when no one is actively chatting with her.
-
-## Migrating an existing agent
-
-1. Add a prompt in `prompts/agents/`.
-2. Add any reusable skills in `skills/`.
-3. Register the agent in `configs/agents.yaml`.
-4. Bind allowed tools and a preferred model.
-5. If needed, add a thin adapter under `src/hub/agents/`.
+- `/status`
+- `/runtime_status`
+- `/provider_status`
+- `/incident`
+- `/agents`
+- `/agent <id>`
+- `/explain_agent <id>`
+- `/restart_runtime`
+- `/validate_agent <id>`
+- `/activate_agent <id>`
+- `/deactivate_agent <id>`
+- `/new_agent`
 
 ## Testing
 
