@@ -54,6 +54,29 @@ def test_vanta_core_records_incident_to_store(repo_copy):
     assert latest["incident"]["failure_type"] == "RuntimeFailure"
 
 
+def test_vanta_core_resolves_incidents_and_clears_active_status(repo_copy):
+    service = VantaCoreService(repo_copy)
+    service.record_incident(
+        component="vanta_core",
+        summary="Telegram polling failure: RuntimeError",
+        likely_cause="Unauthorized",
+        failure_type="RuntimeError",
+        last_action="run_forever",
+    )
+
+    assert service.latest_incident()["incident"]["failure_type"] == "RuntimeError"
+
+    resolved = service.resolve_incidents(
+        component="vanta_core",
+        failure_type="RuntimeError",
+        last_action="run_forever",
+        resolution_note="Recovered.",
+    )
+
+    assert resolved == 1
+    assert service.latest_incident()["message"] == "No active incidents."
+
+
 def test_vanta_core_provider_status_uses_cached_probe(repo_copy, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     probe_path = repo_copy / "data" / "provider_probe.json"
@@ -65,3 +88,11 @@ def test_vanta_core_provider_status_uses_cached_probe(repo_copy, monkeypatch):
     status = service.provider_status()
 
     assert status["provider_ready"] is True
+
+
+def test_vanta_core_plain_text_returns_ops_help(repo_copy):
+    service = VantaCoreService(repo_copy)
+    result = service.handle_command("hello there")
+
+    assert result["status"] == "help"
+    assert "ops mode" in result["message"]

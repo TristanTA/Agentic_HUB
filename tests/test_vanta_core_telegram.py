@@ -58,3 +58,16 @@ def test_vanta_core_telegram_runs_short_agent_interview(tmp_path: Path):
 
     assert service.specs.get_spec("fresh_worker") is not None
     assert "Created draft spec: fresh_worker" in output.sent[-1]["text"]
+
+
+def test_vanta_core_telegram_plain_text_gets_help(tmp_path: Path):
+    service = VantaCoreService(tmp_path)
+    interview = AgentInterviewService(SQLiteStore(tmp_path / "data" / "hub.db"), service.specs)
+    output = StubOutput()
+    bot = VantaCoreTelegramBot(service=service, interview=interview, output=output, bot_token="token", offset_path=tmp_path / "offset.txt")
+
+    bot._handle_update(
+        {"update_id": 1, "message": {"message_id": 1, "from": {"id": 7}, "chat": {"id": 123}, "text": "hello"}}
+    )
+
+    assert "ops mode" in output.sent[-1]["text"]

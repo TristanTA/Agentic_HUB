@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -149,6 +150,8 @@ class SQLiteStore:
                     run_id TEXT,
                     change_id TEXT,
                     details_json TEXT NOT NULL,
+                    resolved_at TEXT,
+                    resolution_note TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL
                 );
                 """
@@ -157,6 +160,8 @@ class SQLiteStore:
             self._ensure_column(conn, "vanta_changes", "severity", "TEXT NOT NULL DEFAULT 'medium'")
             self._ensure_column(conn, "vanta_changes", "evaluated_at", "TEXT")
             self._ensure_column(conn, "vanta_changes", "evaluation_note", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "vanta_incidents", "resolved_at", "TEXT")
+            self._ensure_column(conn, "vanta_incidents", "resolution_note", "TEXT NOT NULL DEFAULT ''")
 
     def _ensure_column(self, conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
         columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -748,8 +753,8 @@ class SQLiteStore:
                 INSERT OR REPLACE INTO vanta_incidents (
                     incident_id, component, severity, summary, likely_cause, failure_type,
                     affected_agent, last_action, vanta_state, next_steps_json, thread_id,
-                    run_id, change_id, details_json, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    run_id, change_id, details_json, resolved_at, resolution_note, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     incident.incident_id,
@@ -766,6 +771,8 @@ class SQLiteStore:
                     incident.run_id,
                     incident.change_id,
                     json.dumps(incident.details),
+                    incident.resolved_at.isoformat() if incident.resolved_at else None,
+                    incident.resolution_note,
                     incident.created_at.isoformat(),
                 ),
             )
@@ -776,7 +783,7 @@ class SQLiteStore:
                 """
                 SELECT incident_id, component, severity, summary, likely_cause, failure_type,
                        affected_agent, last_action, vanta_state, next_steps_json, thread_id,
-                       run_id, change_id, details_json, created_at
+                       run_id, change_id, details_json, resolved_at, resolution_note, created_at
                 FROM vanta_incidents
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -799,7 +806,9 @@ class SQLiteStore:
                 run_id=row[11],
                 change_id=row[12],
                 details=json.loads(row[13]),
-                created_at=row[14],
+                resolved_at=row[14],
+                resolution_note=row[15],
+                created_at=row[16],
             )
             for row in rows
         ]
@@ -807,3 +816,68 @@ class SQLiteStore:
     def latest_vanta_incident(self) -> VantaIncident | None:
         incidents = self.list_vanta_incidents(limit=1)
         return incidents[0] if incidents else None
+
+    def list_active_vanta_incidents(self, limit: int = 10) -> list[VantaIncident]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT incident_id, component, severity, summary, likely_cause, failure_type,
+                       affected_agent, last_action, vanta_state, next_steps_json, thread_id,
+                       run_id, change_id, details_json, resolved_at, resolution_note, created_at
+                FROM vanta_incidents
+                WHERE resolved_at IS NULL
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            VantaIncident(
+                incident_id=row[0],
+                component=row[1],
+                severity=row[2],
+                summary=row[3],
+                likely_cause=row[4],
+                failure_type=row[5],
+                affected_agent=row[6],
+                last_action=row[7],
+                vanta_state=row[8],
+                next_steps=json.loads(row[9]),
+                thread_id=row[10],
+                run_id=row[11],
+                change_id=row[12],
+                details=json.loads(row[13]),
+                resolved_at=row[14],
+                resolution_note=row[15],
+                created_at=row[16],
+            )
+            for row in rows
+        ]
+
+    def latest_active_vanta_incident(self) -> VantaIncident | None:
+        incidents = self.list_active_vanta_incidents(limit=1)
+        return incidents[0] if incidents else None
+
+    def resolve_vanta_incidents(self, *, component: str | None = None, failure_type: str | None = None, last_action: str | None = None, resolution_note: str = "") -> int:
+        clauses = ["resolved_at IS NULL"]
+        params: list[Any] = []
+        if component:
+            clauses.append("component = ?")
+            params.append(component)
+        if failure_type:
+            clauses.append("failure_type = ?")
+            params.append(failure_type)
+        if last_action:
+            clauses.append("last_action = ?")
+            params.append(last_action)
+        resolved_at = datetime.now(timezone.utc).isoformat()
+        with self._connect() as conn:
+            cursor = conn.execute(
+                f"""
+                UPDATE vanta_incidents
+                SET resolved_at = ?, resolution_note = ?
+                WHERE {' AND '.join(clauses)}
+                """,
+                (resolved_at, resolution_note, *params),
+            )
+        return cursor.rowcount

@@ -72,7 +72,10 @@ class AppSettings:
 
 
 def _load_env_file(root_dir: Path) -> None:
-    for filename in [".env", ".env.example"]:
+    # Repo-local env files should control startup for this workspace, even if the
+    # parent shell still has stale inherited values. `.env` is the strongest source,
+    # then `.env.example` acts as the fallback template.
+    for filename in [".env.example", ".env"]:
         path = root_dir / filename
         if not path.exists():
             continue
@@ -83,4 +86,4 @@ def _load_env_file(root_dir: Path) -> None:
             key, value = line.split("=", 1)
             key = key.strip()
             value = value.strip().strip('"').strip("'")
-            os.environ.setdefault(key, value)
+            os.environ[key] = value

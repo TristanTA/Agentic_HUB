@@ -29,6 +29,12 @@ class VantaCoreTelegramBot:
             try:
                 offset = self._load_offset()
                 updates = self._get_updates(offset=offset, timeout=poll_timeout)
+                self.service.resolve_incidents(
+                    component="vanta_core",
+                    failure_type="RuntimeError",
+                    last_action="run_forever",
+                    resolution_note="Telegram polling recovered.",
+                )
                 for update in updates:
                     update_id = int(update.get("update_id", 0))
                     self._store_offset(update_id + 1)

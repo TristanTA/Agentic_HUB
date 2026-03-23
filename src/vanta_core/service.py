@@ -111,10 +111,25 @@ class VantaCoreService:
         return {"status": "ok", "runtime": result}
 
     def latest_incident(self) -> dict:
-        incident = self.store.latest_vanta_incident()
+        incident = self.store.latest_active_vanta_incident()
         if incident is None:
-            return {"status": "ok", "message": "No incidents recorded."}
+            return {"status": "ok", "message": "No active incidents."}
         return {"status": "ok", "incident": incident.model_dump(mode="json")}
+
+    def resolve_incidents(
+        self,
+        *,
+        component: str | None = None,
+        failure_type: str | None = None,
+        last_action: str | None = None,
+        resolution_note: str = "",
+    ) -> int:
+        return self.store.resolve_vanta_incidents(
+            component=component,
+            failure_type=failure_type,
+            last_action=last_action,
+            resolution_note=resolution_note,
+        )
 
     def record_incident(
         self,
@@ -148,7 +163,10 @@ class VantaCoreService:
     def handle_command(self, text: str) -> dict:
         command = parse_management_command(text)
         if command is None:
-            return {"status": "ignored"}
+            return {
+                "status": "help",
+                "message": "Vanta is in ops mode. Use commands like /status, /agents, /incident, /runtime_status, or /new_agent.",
+            }
         if command.name == "status":
             return self.status()
         if command.name == "runtime_status":
@@ -178,6 +196,8 @@ class VantaCoreService:
     def format_result(self, result: dict) -> str:
         if result.get("status") == "interview_start":
             return "Starting new agent interview."
+        if result.get("status") == "help":
+            return result["message"]
         if "message" in result and len(result) <= 2:
             return result["message"]
         if "validation" in result:
@@ -212,7 +232,7 @@ class VantaCoreService:
 
     def _compute_state(self, *, provider_ready: bool | None = None) -> str:
         runtime = self.runtime.status()
-        latest_incident = self.store.latest_vanta_incident()
+        latest_incident = self.store.latest_active_vanta_incident()
         if provider_ready is None:
             provider_ready = bool(os.getenv("OPENAI_API_KEY", "").strip())
         if not provider_ready and not runtime.get("running"):

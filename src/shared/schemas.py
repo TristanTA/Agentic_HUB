@@ -506,4 +506,6 @@ class VantaIncident(BaseModel):
     run_id: str | None = None
     change_id: str | None = None
     details: dict[str, Any] = Field(default_factory=dict)
+    resolved_at: datetime | None = None
+    resolution_note: str = ""
     created_at: datetime = Field(default_factory=utc_now)
