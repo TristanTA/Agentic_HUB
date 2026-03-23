@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,7 +14,7 @@ from control_plane.log_reader import LogReader
 from control_plane.manager_agent import ManagerAgent
 from control_plane.process_control import ProcessController
 from hub.registry.loader import load_registries
-from shared.schemas import AgentScorecard, ManagementAction, VantaChangeRecord, VantaScorecard
+from shared.schemas import AgentScorecard, ManagementAction, VantaChangeRecord, VantaIncident, VantaScorecard
 from storage.files.repository import FileRepository
 from storage.sqlite.db import SQLiteStore
 
@@ -32,6 +33,7 @@ class ControlPlaneService:
         self.builder = BuilderService(root_dir, self.editor, self.file_repo)
         self.audit_actor = self.bundle.management_config.audit_actor
         self.runtime = None
+        self.incident_ledger_path = self.root_dir / "docs" / "vanta_incidents.md"
 
     def bind_runtime(self, runtime) -> None:
         self.runtime = runtime
@@ -54,6 +56,144 @@ class ControlPlaneService:
 
     def health(self) -> dict:
         return self.store.latest_health() or {"status": "unknown", "details": {}}
+
+    def provider_status(self) -> dict:
+        vanta = self.bundle.agents["vanta_manager"]
+        model = self.bundle.models[vanta.preferred_model]
+        provider_ready = True
+        reason = "Provider is ready."
+        if model.provider == "openai" and not os.getenv("OPENAI_API_KEY", "").strip():
+            provider_ready = False
+            reason = "OPENAI_API_KEY is missing."
+        vanta_state = self._compute_vanta_state(provider_ready=provider_ready)
+        return {
+            "status": "ok",
+            "agent_id": vanta.id,
+            "model_id": vanta.preferred_model,
+            "provider": model.provider,
+            "provider_ready": provider_ready,
+            "reason": reason,
+            "vanta_state": vanta_state,
+            "incident_ledger_path": str(self.incident_ledger_path.relative_to(self.root_dir)),
+        }
+
+    def _compute_vanta_state(self, *, provider_ready: bool | None = None) -> str:
+        latest_incident = self.store.latest_vanta_incident()
+        if provider_ready is None:
+            provider_ready = self.provider_status()["provider_ready"] if "provider_status" in dir(self) else True
+        hub_running = self.status().get("running", False)
+        if not provider_ready:
+            return "recovery_only"
+        if latest_incident is not None:
+            return "incident_active"
+        if not hub_running:
+            return "degraded"
+        return "ready"
+
+    def record_incident(
+        self,
+        *,
+        component: str,
+        summary: str,
+        likely_cause: str,
+        failure_type: str,
+        affected_agent: str = "vanta_manager",
+        last_action: str = "",
+        thread_id: str | None = None,
+        run_id: str | None = None,
+        change_id: str | None = None,
+        severity: str = "high",
+        details: dict | None = None,
+    ) -> dict:
+        incident = VantaIncident(
+            incident_id=str(uuid.uuid4()),
+            component=component,
+            severity=severity,
+            summary=self._sanitize_text(summary, max_len=240),
+            likely_cause=self._sanitize_text(likely_cause, max_len=320),
+            failure_type=failure_type,
+            affected_agent=affected_agent,
+            last_action=self._sanitize_text(last_action, max_len=200),
+            vanta_state="incident_active" if self.provider_status()["provider_ready"] else "recovery_only",
+            next_steps=["/vanta_status", "/incident", "/provider_status"],
+            thread_id=thread_id,
+            run_id=run_id,
+            change_id=change_id,
+            details=self._sanitize_payload(details or {}),
+        )
+        self.store.record_vanta_incident(incident)
+        try:
+            self._append_incident_ledger(incident)
+        except Exception as exc:
+            incident.details["ledger_write_failed"] = self._sanitize_text(exc, max_len=200)
+        return incident.model_dump(mode="json")
+
+    def latest_incident(self) -> dict:
+        incident = self.store.latest_vanta_incident()
+        if incident is None:
+            return {
+                "status": "ok",
+                "message": "No incidents recorded.",
+                "incident_ledger_path": str(self.incident_ledger_path.relative_to(self.root_dir)),
+            }
+        return {
+            "status": "ok",
+            "incident": incident.model_dump(mode="json"),
+            "incident_ledger_path": str(self.incident_ledger_path.relative_to(self.root_dir)),
+        }
+
+    def _append_incident_ledger(self, incident: VantaIncident) -> None:
+        self.incident_ledger_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.incident_ledger_path.exists():
+            self.incident_ledger_path.write_text("# Vanta Incident Ledger\n\n", encoding="utf-8")
+        entry = "\n".join(
+            [
+                f"## {incident.created_at.isoformat()} | {incident.severity} | {incident.component}",
+                f"- Summary: {incident.summary}",
+                f"- Likely cause: {incident.likely_cause}",
+                f"- Failure type: {incident.failure_type}",
+                f"- Affected agent: {incident.affected_agent}",
+                f"- Last action: {incident.last_action or 'unknown'}",
+                f"- Vanta state: {incident.vanta_state}",
+                f"- Run id: {incident.run_id or 'n/a'}",
+                f"- Change id: {incident.change_id or 'n/a'}",
+                f"- Next step: {', '.join(incident.next_steps) if incident.next_steps else 'n/a'}",
+                "",
+            ]
+        )
+        current = self.incident_ledger_path.read_text(encoding="utf-8")
+        self.incident_ledger_path.write_text(current + entry, encoding="utf-8")
+
+    def _sanitize_payload(self, payload: dict) -> dict:
+        sanitized = {}
+        for key, value in payload.items():
+            lowered = str(key).lower()
+            if any(token in lowered for token in ["token", "secret", "key", "password"]):
+                sanitized[key] = "[redacted]"
+                continue
+            sanitized[key] = self._sanitize_text(value, max_len=500)
+        return sanitized
+
+    def _sanitize_text(self, value, *, max_len: int = 300) -> str:
+        text = str(value or "").replace("\r", " ").replace("\n", " ").strip()
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        text = text.replace(api_key, "[redacted]") if api_key else text
+        return text[:max_len] + ("..." if len(text) > max_len else "")
+
+    def format_incident_report(self, result: dict) -> str:
+        incident = result.get("incident", result)
+        next_steps = incident.get("next_steps") or ["/incident", "/vanta_status"]
+        return "\n".join(
+            [
+                "Vanta incident detected.",
+                f"Component: {incident.get('component', 'unknown')}",
+                f"Failure: {incident.get('failure_type', 'unknown')}",
+                f"Summary: {incident.get('summary', 'No summary available.')}",
+                f"Agent: {incident.get('affected_agent', 'vanta_manager')}",
+                f"State: {incident.get('vanta_state', 'incident_active')}",
+                f"Next: {' '.join(next_steps[:2])}",
+            ]
+        )
 
     def hub_overview(self) -> dict:
         if self.runtime is not None:
@@ -108,6 +248,14 @@ class ControlPlaneService:
             path = self.root_dir / "logs" / "telegram_runner.log"
             content = path.read_text(encoding="utf-8").splitlines()[-lines:] if path.exists() else []
             return {"status": "ok", "target": target, "lines": content}
+        if target == "control":
+            if not self.incident_ledger_path.exists():
+                return {"status": "ok", "target": target, "lines": ["No control-plane incident ledger found yet."]}
+            return {
+                "status": "ok",
+                "target": target,
+                "lines": self.incident_ledger_path.read_text(encoding="utf-8").splitlines()[-lines:],
+            }
         return {"status": "ok", "target": target, "lines": self.logs.tail_human_log(lines=lines)}
 
     def inspect_run_trace(self, run_id: str) -> dict:
@@ -321,12 +469,18 @@ class ControlPlaneService:
         latest_review = self.store.latest_vanta_review()
         latest_lesson = self.store.list_vanta_lessons(limit=1)
         recent_changes = self.store.list_vanta_changes(limit=3)
+        latest_incident = self.store.latest_vanta_incident()
+        provider = self.provider_status()
         return {
             "status": "ok",
+            "vanta_state": self._compute_vanta_state(provider_ready=provider["provider_ready"]),
+            "provider_status": provider,
             "current_focus": latest_review.focus_area if latest_review else "agent_effectiveness",
             "last_review": latest_review.model_dump(mode="json") if latest_review else None,
             "last_lesson": latest_lesson[0].model_dump(mode="json") if latest_lesson else None,
             "recent_changes": [change.model_dump(mode="json") for change in recent_changes],
+            "latest_incident": latest_incident.model_dump(mode="json") if latest_incident else None,
+            "incident_ledger_path": str(self.incident_ledger_path.relative_to(self.root_dir)),
             "autonomy": self.bundle.hub_config.vanta.model_dump(),
         }
 
@@ -467,6 +621,7 @@ class ControlPlaneService:
                 "message": "\n".join(
                     [
                         "/status /health /errors /trace /logs /routes",
+                        "/incident /last_failure /provider_status",
                         "/agents /agent /workers /tasks /delegate",
                         "/review_agent /improve_agent",
                         "/vanta_status /vanta_focus /vanta_docs /vanta_lessons /vanta_changes /vanta_review /vanta_scorecard",
@@ -490,6 +645,12 @@ class ControlPlaneService:
             return self.restart_hub()
         if command.name == "errors":
             return {"status": "ok", "errors": self.inspect_recent_errors()[: int(command.options.get("limit", "10"))]}
+        if command.name == "incident":
+            return self.latest_incident()
+        if command.name == "last_failure":
+            return self.latest_incident()
+        if command.name == "provider_status":
+            return self.provider_status()
         if command.name == "trace":
             if not command.args:
                 return {"status": "needs_input", "command": command.name, "message": "Usage: /trace <run_id>"}
@@ -686,6 +847,21 @@ class ControlPlaneService:
             if not errors:
                 return "No recent errors."
             return "\n".join(f"{item['run_id']}: {item['errors']}" for item in errors[:5])
+        if "provider_ready" in result and "provider" in result:
+            return (
+                f"Provider: {result['provider']}\n"
+                f"Ready: {result['provider_ready']}\n"
+                f"Reason: {result['reason']}\n"
+                f"Vanta state: {result['vanta_state']}\n"
+                f"Ledger: {result.get('incident_ledger_path', 'docs/vanta_incidents.md')}"
+            )
+        if "incident" in result:
+            return (
+                self.format_incident_report(result)
+                + f"\nLedger: {result.get('incident_ledger_path', 'docs/vanta_incidents.md')}"
+            )
+        if "incident_ledger_path" in result and "message" in result:
+            return f"{result['message']}\nLedger: {result['incident_ledger_path']}"
         if "trace" in result:
             trace = result["trace"]
             return f"{trace['run_id']} | latency={trace['latency_ms']} | errors={trace['errors']}"
@@ -733,7 +909,11 @@ class ControlPlaneService:
             recent = result.get("recent_changes", [])
             recent_summary = ", ".join(item["change_id"] for item in recent) if recent else "none"
             return (
+                f"State: {result.get('vanta_state', '')}\n"
+                f"Provider: {result.get('provider_status', {}).get('provider', '')} ready={result.get('provider_status', {}).get('provider_ready', '')}\n"
                 f"Focus: {result.get('current_focus', '')}\n"
+                f"Latest incident: {result.get('latest_incident', {})}\n"
+                f"Ledger: {result.get('incident_ledger_path', 'docs/vanta_incidents.md')}\n"
                 f"Autonomy: {result.get('autonomy', {})}\n"
                 f"Last review: {result.get('last_review', {})}\n"
                 f"Last lesson: {result.get('last_lesson', {})}\n"
@@ -821,6 +1001,14 @@ def build_app(root_dir: Path) -> FastAPI:
     @app.get("/vanta-status")
     def vanta_status():
         return service.vanta_status()
+
+    @app.get("/provider-status")
+    def provider_status():
+        return service.provider_status()
+
+    @app.get("/incident")
+    def incident():
+        return service.latest_incident()
 
     @app.get("/vanta-lessons")
     def vanta_lessons():

@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from shared.schemas import AgentTaskRecord, ManagementAction, MemoryItem, MemorySearchResult, RunTrace, ThreadWorkingState, VantaChangeRecord, VantaLesson, VantaReviewCycle
+from shared.schemas import AgentTaskRecord, ManagementAction, MemoryItem, MemorySearchResult, RunTrace, ThreadWorkingState, VantaChangeRecord, VantaIncident, VantaLesson, VantaReviewCycle
 
 
 class SQLiteStore:
@@ -133,6 +133,23 @@ class SQLiteStore:
                     resolved_information_json TEXT NOT NULL,
                     next_step TEXT NOT NULL,
                     updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS vanta_incidents (
+                    incident_id TEXT PRIMARY KEY,
+                    component TEXT NOT NULL,
+                    severity TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    likely_cause TEXT NOT NULL,
+                    failure_type TEXT NOT NULL,
+                    affected_agent TEXT NOT NULL,
+                    last_action TEXT NOT NULL,
+                    vanta_state TEXT NOT NULL,
+                    next_steps_json TEXT NOT NULL,
+                    thread_id TEXT,
+                    run_id TEXT,
+                    change_id TEXT,
+                    details_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
                 );
                 """
             )
@@ -723,3 +740,70 @@ class SQLiteStore:
                 candidates.append(MemorySearchResult(source_type="change", source_id=change.change_id, text=change.reason, score=score))
         candidates.sort(key=lambda item: item.score, reverse=True)
         return candidates[:limit]
+
+    def record_vanta_incident(self, incident: VantaIncident) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO vanta_incidents (
+                    incident_id, component, severity, summary, likely_cause, failure_type,
+                    affected_agent, last_action, vanta_state, next_steps_json, thread_id,
+                    run_id, change_id, details_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    incident.incident_id,
+                    incident.component,
+                    incident.severity,
+                    incident.summary,
+                    incident.likely_cause,
+                    incident.failure_type,
+                    incident.affected_agent,
+                    incident.last_action,
+                    incident.vanta_state,
+                    json.dumps(incident.next_steps),
+                    incident.thread_id,
+                    incident.run_id,
+                    incident.change_id,
+                    json.dumps(incident.details),
+                    incident.created_at.isoformat(),
+                ),
+            )
+
+    def list_vanta_incidents(self, limit: int = 10) -> list[VantaIncident]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT incident_id, component, severity, summary, likely_cause, failure_type,
+                       affected_agent, last_action, vanta_state, next_steps_json, thread_id,
+                       run_id, change_id, details_json, created_at
+                FROM vanta_incidents
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            VantaIncident(
+                incident_id=row[0],
+                component=row[1],
+                severity=row[2],
+                summary=row[3],
+                likely_cause=row[4],
+                failure_type=row[5],
+                affected_agent=row[6],
+                last_action=row[7],
+                vanta_state=row[8],
+                next_steps=json.loads(row[9]),
+                thread_id=row[10],
+                run_id=row[11],
+                change_id=row[12],
+                details=json.loads(row[13]),
+                created_at=row[14],
+            )
+            for row in rows
+        ]
+
+    def latest_vanta_incident(self) -> VantaIncident | None:
+        incidents = self.list_vanta_incidents(limit=1)
+        return incidents[0] if incidents else None

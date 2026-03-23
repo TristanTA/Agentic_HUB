@@ -41,6 +41,15 @@ class TelegramBotRunner:
                 if not updates:
                     time.sleep(sleep_seconds)
             except Exception as exc:
+                self.control_plane.record_incident(
+                    component="telegram_runner",
+                    summary=f"{type(exc).__name__} in Telegram polling loop",
+                    likely_cause=str(exc),
+                    failure_type=type(exc).__name__,
+                    affected_agent=self.target_agent_id or "vanta_manager",
+                    last_action="run_forever",
+                    details={"target_agent_id": self.target_agent_id or ""},
+                )
                 self._log_error(f"telegram_runner_error[{self.target_agent_id or 'vanta'}]: {type(exc).__name__}: {exc}")
                 time.sleep(sleep_seconds)
 
@@ -56,35 +65,63 @@ class TelegramBotRunner:
         if self.allowed_chat_ids and thread_id not in self.allowed_chat_ids:
             return
 
-        if self.target_agent_id:
-            self.output.send_chat_action(thread_id, "typing")
-            result = self.runtime.process_event_for_agent(event, self.target_agent_id, output_adapter=self.output)
-            if result.get("status") == "paused":
-                self.output.send({"thread_id": thread_id, "text": "Hub is paused."})
-            return
-
-        session_key = self._session_key(chat_id=thread_id, user_id=str(update.get("message", {}).get("from", {}).get("id", "")))
-        wizard_reply = self.wizard.handle_text(session_key, event.text)
-        if wizard_reply is not None:
-            self.output.send({"thread_id": thread_id, "text": wizard_reply.text, "reply_markup": wizard_reply.reply_markup})
-            return
-
-        if event.text.startswith("/"):
-            if event.text.split()[0].startswith("/new_agent"):
-                wizard_result = self.wizard.start_new_agent(session_key)
-                self.output.send({"thread_id": thread_id, "text": wizard_result.text, "reply_markup": wizard_result.reply_markup})
+        try:
+            if self.target_agent_id:
+                self.output.send_chat_action(thread_id, "typing")
+                result = self.runtime.process_event_for_agent(event, self.target_agent_id, output_adapter=self.output)
+                if result.get("status") == "paused":
+                    self._safe_send(thread_id=thread_id, text="Hub is paused.", last_action="direct_paused_notice")
                 return
-            result = self.control_plane.handle_management_command(event.text)
-            if result.get("status") in {"created", "reloaded", "updated"}:
-                self.runtime.reload_config()
-            text = self.control_plane.format_management_result(result)
-            self.output.send({"thread_id": thread_id, "text": text})
-            return
 
-        self.output.send_chat_action(thread_id, "typing")
-        result = self.runtime.process_event(event)
-        if result.get("status") == "paused":
-            self.output.send({"thread_id": thread_id, "text": "Hub is paused."})
+            session_key = self._session_key(chat_id=thread_id, user_id=str(update.get("message", {}).get("from", {}).get("id", "")))
+            wizard_reply = self.wizard.handle_text(session_key, event.text)
+            if wizard_reply is not None:
+                self._safe_send(
+                    thread_id=thread_id,
+                    text=wizard_reply.text,
+                    reply_markup=wizard_reply.reply_markup,
+                    last_action="wizard_reply",
+                )
+                return
+
+            if event.text.startswith("/"):
+                if event.text.split()[0].startswith("/new_agent"):
+                    wizard_result = self.wizard.start_new_agent(session_key)
+                    self._safe_send(
+                        thread_id=thread_id,
+                        text=wizard_result.text,
+                        reply_markup=wizard_result.reply_markup,
+                        last_action="wizard_start",
+                    )
+                    return
+                result = self.control_plane.handle_management_command(event.text)
+                if result.get("status") in {"created", "reloaded", "updated"}:
+                    self.runtime.reload_config()
+                text = self.control_plane.format_management_result(result)
+                self._safe_send(thread_id=thread_id, text=text, last_action="management_command")
+                return
+
+            self.output.send_chat_action(thread_id, "typing")
+            result = self.runtime.process_event(event)
+            if result.get("status") == "paused":
+                self._safe_send(thread_id=thread_id, text="Hub is paused.", last_action="paused_notice")
+        except Exception as exc:
+            incident = self.control_plane.record_incident(
+                component="telegram_runner",
+                summary=f"{type(exc).__name__} while handling Telegram update",
+                likely_cause=str(exc),
+                failure_type=type(exc).__name__,
+                affected_agent=self.target_agent_id or "vanta_manager",
+                last_action="handle_update",
+                thread_id=thread_id,
+                details={"target_agent_id": self.target_agent_id or ""},
+            )
+            self._log_error(f"telegram_runner_error[{self.target_agent_id or 'vanta'}]: {type(exc).__name__}: {exc}")
+            self._safe_send(
+                thread_id=thread_id,
+                text=self.control_plane.format_incident_report(incident),
+                last_action="incident_report",
+            )
 
     def _handle_callback_query(self, callback_query: dict) -> None:
         if self.target_agent_id:
@@ -104,7 +141,7 @@ class TelegramBotRunner:
             return
         if result.final_result and result.final_result.get("status") in {"created", "reloaded", "updated"}:
             self.runtime.reload_config()
-        self.output.send({"thread_id": chat_id, "text": result.text, "reply_markup": result.reply_markup})
+        self._safe_send(thread_id=chat_id, text=result.text, reply_markup=result.reply_markup, last_action="callback_reply")
 
     def _get_updates(self, *, offset: int, timeout: int) -> list[dict]:
         query = parse.urlencode({"offset": offset, "timeout": timeout})
@@ -141,6 +178,24 @@ class TelegramBotRunner:
         with log_path.open("a", encoding="utf-8") as handle:
             handle.write(message + "\n")
 
+    def _safe_send(self, *, thread_id: str, text: str, last_action: str, reply_markup: dict | None = None) -> dict:
+        result = self.output.send({"thread_id": thread_id, "text": text, "reply_markup": reply_markup})
+        if result.get("status") == "sent":
+            return result
+        self.control_plane.record_incident(
+            component="telegram_runner",
+            summary="Telegram send returned a non-sent status",
+            likely_cause=result.get("reason") or result.get("detail") or "Telegram output adapter could not deliver the message.",
+            failure_type="TelegramSendFailure",
+            affected_agent=self.target_agent_id or "vanta_manager",
+            last_action=last_action,
+            thread_id=thread_id,
+            severity="medium",
+            details=result,
+        )
+        self._log_error(f"telegram_send_failure[{self.target_agent_id or 'vanta'}]: {result}")
+        return result
+
     def _register_commands(self) -> None:
         if self.target_agent_id:
             self.output.set_my_commands([{"command": "status", "description": f"Talk to {self.target_agent_id}"}])
@@ -161,6 +216,9 @@ class TelegramBotRunner:
             {"command": "health", "description": "Show latest health snapshot"},
             {"command": "reload", "description": "Reload hub configuration"},
             {"command": "errors", "description": "Show recent runtime errors"},
+            {"command": "incident", "description": "Show the latest structured incident"},
+            {"command": "last_failure", "description": "Show the latest failure summary"},
+            {"command": "provider_status", "description": "Show provider readiness"},
             {"command": "trace", "description": "Inspect one run trace"},
             {"command": "logs", "description": "Show recent hub or Telegram logs"},
             {"command": "routes", "description": "Show routing rules"},

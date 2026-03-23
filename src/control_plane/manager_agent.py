@@ -48,7 +48,7 @@ class ManagerAgent:
         if command.name == "trace":
             return "Usage: /trace <run_id>"
         if command.name == "logs":
-            return "Usage: /logs [--target hub|telegram] [--lines 20]"
+            return "Usage: /logs [--target hub|telegram|control] [--lines 20]"
         if command.name in {"agent", "review_agent", "improve_agent"}:
             return f"Usage: /{command.name} <agent_id>"
         if command.name == "rollback_change":
@@ -59,6 +59,6 @@ class ManagerAgent:
             return "Usage: /memory_search --query <text>"
         if command.name == "triage":
             return "Usage: /triage --text <request>"
-        if command.name in {"status", "health", "reload", "pause", "resume", "restart", "errors", "routes", "scorecards", "consolidate_vanta", "vanta_docs", "vanta_lessons", "vanta_changes", "vanta_status", "vanta_focus", "vanta_digest", "vanta_review", "vanta_scorecard", "agents", "workers", "tasks"}:
+        if command.name in {"status", "health", "reload", "pause", "resume", "restart", "errors", "routes", "scorecards", "consolidate_vanta", "vanta_docs", "vanta_lessons", "vanta_changes", "vanta_status", "vanta_focus", "vanta_digest", "vanta_review", "vanta_scorecard", "agents", "workers", "tasks", "incident", "last_failure", "provider_status"}:
             return f"Usage: /{command.name}"
         return f"Unknown management command: /{command.name}"

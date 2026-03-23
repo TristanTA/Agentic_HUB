@@ -60,6 +60,7 @@ class StubControlPlane:
         self.response = response
         self.commands: list[str] = []
         self.builder = object()
+        self.incidents: list[dict] = []
 
     def handle_management_command(self, text: str) -> dict:
         self.commands.append(text)
@@ -67,6 +68,13 @@ class StubControlPlane:
 
     def format_management_result(self, result: dict) -> str:
         return json.dumps(result, sort_keys=True)
+
+    def record_incident(self, **kwargs) -> dict:
+        self.incidents.append(kwargs)
+        return {"incident": kwargs, **kwargs}
+
+    def format_incident_report(self, result: dict) -> str:
+        return f"INCIDENT: {result.get('summary', '')}"
 
 
 class StubWizardResponse:
@@ -195,3 +203,36 @@ def test_telegram_runner_registers_vanta_ops_commands(tmp_path: Path):
     assert "rollback_change" in commands
     assert "vanta_digest" in commands
     assert "memory_search" in commands
+    assert "incident" in commands
+    assert "last_failure" in commands
+    assert "provider_status" in commands
+
+
+def test_telegram_runner_reports_runtime_failure_as_incident(tmp_path: Path):
+    runner, runtime, control, wizard, output = make_runner(tmp_path)
+
+    def boom(event):
+        raise RuntimeError("runtime exploded")
+
+    runtime.process_event = boom
+
+    runner._handle_update(
+        {"update_id": 1, "message": {"message_id": 10, "from": {"id": 456}, "chat": {"id": 123}, "text": "hello vanta"}}
+    )
+
+    assert control.incidents
+    assert output.sent[-1]["text"].startswith("INCIDENT:")
+
+
+def test_safe_send_records_non_sent_telegram_result(tmp_path: Path):
+    runner, runtime, control, wizard, output = make_runner(tmp_path)
+
+    def fail_send(payload: dict) -> dict:
+        output.sent.append(payload)
+        return {"status": "error", "reason": "telegram_network_timeout"}
+
+    output.send = fail_send
+    runner._safe_send(thread_id="123", text="hello", last_action="test_send")
+
+    assert control.incidents
+    assert control.incidents[-1]["failure_type"] == "TelegramSendFailure"

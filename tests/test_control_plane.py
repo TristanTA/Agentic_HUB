@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import yaml
 
 from control_plane.service import ControlPlaneService
@@ -68,3 +70,61 @@ def test_protected_path_rejects_direct_prompt_edit(repo_copy):
         assert "Protected path" in str(exc)
     else:
         raise AssertionError("Expected protected path edit to fail")
+
+
+def test_record_incident_persists_to_sqlite_and_tracked_ledger(repo_copy):
+    service = ControlPlaneService(repo_copy)
+
+    result = service.record_incident(
+        component="hub_runtime",
+        summary="Runtime failed while processing a long message",
+        likely_cause=f"OPENAI_API_KEY was {os.getenv('OPENAI_API_KEY', 'missing')}",
+        failure_type="RuntimeError",
+        last_action="process_event",
+        details={"api_key": "super-secret", "payload": "x" * 900},
+    )
+
+    ledger = (repo_copy / "docs" / "vanta_incidents.md").read_text(encoding="utf-8")
+    assert result["summary"].startswith("Runtime failed while processing")
+    assert "super-secret" not in ledger
+    assert "[redacted]" in ledger or "missing" in ledger
+    assert "RuntimeError" in ledger
+
+
+def test_provider_status_and_latest_incident_commands(repo_copy, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    service = ControlPlaneService(repo_copy)
+    service.record_incident(
+        component="model_provider",
+        summary="Provider unavailable for Vanta",
+        likely_cause="OPENAI_API_KEY is missing.",
+        failure_type="ProviderUnavailable",
+        last_action="provider_check",
+    )
+
+    provider = service.handle_management_command("/provider_status")
+    incident = service.handle_management_command("/incident")
+    last_failure = service.handle_management_command("/last_failure")
+
+    assert provider["status"] == "ok"
+    assert provider["provider_ready"] is False
+    assert provider["vanta_state"] == "recovery_only"
+    assert incident["status"] == "ok"
+    assert incident["incident"]["failure_type"] == "ProviderUnavailable"
+    assert last_failure["incident"]["summary"] == incident["incident"]["summary"]
+
+
+def test_control_logs_target_reads_tracked_incident_ledger(repo_copy):
+    service = ControlPlaneService(repo_copy)
+    service.record_incident(
+        component="control_plane",
+        summary="A config validation failed",
+        likely_cause="Bad YAML",
+        failure_type="ValidationError",
+        last_action="reload_config",
+    )
+
+    result = service.tail_logs(target="control", lines=10)
+
+    assert result["status"] == "ok"
+    assert any("ValidationError" in line for line in result["lines"])

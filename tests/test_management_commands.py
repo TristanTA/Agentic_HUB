@@ -144,3 +144,23 @@ def test_vanta_digest_command_returns_summary(repo_copy):
 
     assert result["status"] == "ok"
     assert "focus" in result
+
+
+def test_incident_and_provider_commands_are_available(repo_copy, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    service = ControlPlaneService(repo_copy)
+    service.record_incident(
+        component="telegram_runner",
+        summary="Telegram send failed",
+        likely_cause="Network outage",
+        failure_type="TelegramSendFailure",
+        last_action="send_output",
+    )
+
+    incident = service.handle_management_command("/incident")
+    provider = service.handle_management_command("/provider_status")
+
+    assert incident["status"] == "ok"
+    assert incident["incident"]["component"] == "telegram_runner"
+    assert provider["status"] == "ok"
+    assert "incident_ledger_path" in provider

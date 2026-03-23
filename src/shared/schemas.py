@@ -400,3 +400,21 @@ class MemorySearchResult(BaseModel):
     source_id: str
     text: str
     score: int
+
+
+class VantaIncident(BaseModel):
+    incident_id: str
+    component: str
+    severity: str = "high"
+    summary: str
+    likely_cause: str
+    failure_type: str
+    affected_agent: str = "vanta_manager"
+    last_action: str = ""
+    vanta_state: str = "incident_active"
+    next_steps: list[str] = Field(default_factory=list)
+    thread_id: str | None = None
+    run_id: str | None = None
+    change_id: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=utc_now)

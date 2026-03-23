@@ -47,6 +47,7 @@ class HubRuntime:
             for workflow in bundle.workflows.values()
             if workflow.enabled
         }
+        self.control_plane = None
         self._write_state("running")
 
     def reload_config(self) -> None:
@@ -113,12 +114,16 @@ class HubRuntime:
         run_id = str(uuid.uuid4())
         decision = self.router.route(event)
         agent_id = decision.target_id if decision.target_id in self.bundle.agents else self.bundle.hub_config.hub.default_agent
-        if self.bundle.agents[agent_id].memory_scope == "session":
-            self.store.append_conversation_message(thread_id=event.thread_id, agent_id=agent_id, role="user", text=event.text)
-        if agent_id == "vanta_manager":
-            self._update_memory_and_state_from_user(event.thread_id, agent_id, event.text)
-        context = self._build_context(run_id, event, decision)
-        result_text = self._execute(decision, context)
+        try:
+            if self.bundle.agents[agent_id].memory_scope == "session":
+                self.store.append_conversation_message(thread_id=event.thread_id, agent_id=agent_id, role="user", text=event.text)
+            if agent_id == "vanta_manager":
+                self._update_memory_and_state_from_user(event.thread_id, agent_id, event.text)
+            context = self._build_context(run_id, event, decision)
+            result_text = self._execute(decision, context)
+        except Exception as exc:
+            self._record_runtime_incident(component="hub_runtime", exc=exc, agent_id=agent_id, thread_id=event.thread_id, run_id=run_id, last_action=f"process_event:{decision.target_id}")
+            raise
         latency_ms = int((time.perf_counter() - start) * 1000)
         trace = RunTrace(
             run_id=run_id,
@@ -149,7 +154,14 @@ class HubRuntime:
             self.store.append_conversation_message(thread_id=event.thread_id, agent_id=agent_id, role="assistant", text=result_text)
         if agent_id == "vanta_manager":
             self._update_working_state_from_assistant(event.thread_id, agent_id, result_text)
-        self.telegram_output.send({"thread_id": event.thread_id, "text": result_text})
+        send_result = self.telegram_output.send({"thread_id": event.thread_id, "text": result_text})
+        self._record_send_failure_if_needed(
+            send_result=send_result,
+            thread_id=event.thread_id,
+            agent_id=agent_id,
+            run_id=run_id,
+            last_action="process_event:send_output",
+        )
         return {"run_id": run_id, "output_text": result_text, "route": decision.model_dump()}
 
     def process_event_for_agent(self, event, agent_id: str, output_adapter: TelegramOutputAdapter | None = None) -> dict:
@@ -165,17 +177,28 @@ class HubRuntime:
             reason="Direct agent runner",
             config_version="v1",
         )
-        if self.bundle.agents[agent_id].memory_scope == "session":
-            self.store.append_conversation_message(thread_id=event.thread_id, agent_id=agent_id, role="user", text=event.text)
-        if agent_id == "vanta_manager":
-            self._update_memory_and_state_from_user(event.thread_id, agent_id, event.text)
-        context = self._build_context(run_id, event, decision)
-        result_text = self._execute(decision, context)
+        try:
+            if self.bundle.agents[agent_id].memory_scope == "session":
+                self.store.append_conversation_message(thread_id=event.thread_id, agent_id=agent_id, role="user", text=event.text)
+            if agent_id == "vanta_manager":
+                self._update_memory_and_state_from_user(event.thread_id, agent_id, event.text)
+            context = self._build_context(run_id, event, decision)
+            result_text = self._execute(decision, context)
+        except Exception as exc:
+            self._record_runtime_incident(component="hub_runtime", exc=exc, agent_id=agent_id, thread_id=event.thread_id, run_id=run_id, last_action=f"process_event_for_agent:{agent_id}")
+            raise
         if self.bundle.agents[agent_id].memory_scope == "session":
             self.store.append_conversation_message(thread_id=event.thread_id, agent_id=agent_id, role="assistant", text=result_text)
         if agent_id == "vanta_manager":
             self._update_working_state_from_assistant(event.thread_id, agent_id, result_text)
-        (output_adapter or self.telegram_output).send({"thread_id": event.thread_id, "text": result_text})
+        send_result = (output_adapter or self.telegram_output).send({"thread_id": event.thread_id, "text": result_text})
+        self._record_send_failure_if_needed(
+            send_result=send_result,
+            thread_id=event.thread_id,
+            agent_id=agent_id,
+            run_id=run_id,
+            last_action="process_event_for_agent:send_output",
+        )
         return {"run_id": run_id, "output_text": result_text, "route": decision.model_dump()}
 
     def _build_context(self, run_id: str, event, decision: RouteDecision) -> AgentContext:
@@ -418,8 +441,24 @@ class HubRuntime:
                     raise ValueError(f"No adapter registered for {spec.id}")
                 result = adapter.send_message(context.event.text, thread_id=context.event.thread_id)
                 return json.dumps(result)
+            provider_available = self.model_registry.supports_function_tools(spec.preferred_model)
+            strict_vanta_mode = hasattr(getattr(self, "control_plane", None), "record_incident")
+            if spec.id == "vanta_manager" and strict_vanta_mode and not provider_available:
+                raise RuntimeError("Vanta requires a real model provider and cannot use degraded fallback mode.")
             if self.model_registry.supports_function_tools(spec.preferred_model) and spec.allowed_tools:
                 return self._execute_agent_with_tools(spec, context)
+            self.logger.log(
+                "hub.model_fallback",
+                {
+                    "agent_id": spec.id,
+                    "model_id": spec.preferred_model,
+                    "provider_available": provider_available,
+                    "route_target": decision.target_id,
+                    "thread_id": context.event.thread_id,
+                    "run_id": context.run_id,
+                    "tool_mode": bool(spec.allowed_tools),
+                },
+            )
             return self.agents[decision.target_id].handle(context, context.event.text).output_text
         if decision.target_type == TargetType.WORKFLOW:
             workflow = self.bundle.workflows[decision.target_id]
@@ -477,3 +516,58 @@ class HubRuntime:
             blocks.append(f"Recent Conversation:\n{context.conversation_history}")
         blocks.append(f"Current Input:\n{context.event.text}")
         return "\n\n".join(blocks)
+
+    def _record_runtime_incident(self, *, component: str, exc: Exception, agent_id: str, thread_id: str, run_id: str, last_action: str) -> None:
+        control = getattr(self, "control_plane", None)
+        self.logger.log(
+            "hub.run_failed",
+            {
+                "run_id": run_id,
+                "agent_id": agent_id,
+                "component": component,
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+                "last_action": last_action,
+            },
+        )
+        if control is not None and hasattr(control, "record_incident"):
+            control.record_incident(
+                component=component,
+                summary=f"{type(exc).__name__} while handling {agent_id}",
+                likely_cause=str(exc),
+                failure_type=type(exc).__name__,
+                affected_agent=agent_id,
+                last_action=last_action,
+                thread_id=thread_id,
+                run_id=run_id,
+                details={"agent_id": agent_id, "thread_id": thread_id},
+            )
+
+    def _record_send_failure_if_needed(self, *, send_result: dict, thread_id: str, agent_id: str, run_id: str, last_action: str) -> None:
+        status = str(send_result.get("status", ""))
+        if status in {"sent", "disabled"}:
+            return
+        self.logger.log(
+            "hub.telegram_send_issue",
+            {
+                "run_id": run_id,
+                "agent_id": agent_id,
+                "thread_id": thread_id,
+                "last_action": last_action,
+                "send_result": send_result,
+            },
+        )
+        control = getattr(self, "control_plane", None)
+        if control is not None:
+            control.record_incident(
+                component="telegram_runner",
+                summary=f"Telegram send failed for {agent_id}",
+                likely_cause=send_result.get("reason") or send_result.get("detail") or "Telegram output send returned a non-sent status.",
+                failure_type="TelegramSendFailure",
+                affected_agent=agent_id,
+                last_action=last_action,
+                thread_id=thread_id,
+                run_id=run_id,
+                severity="medium",
+                details=send_result,
+            )
