@@ -169,6 +169,7 @@ class TelegramBotRunner:
             {"command": "vanta_docs", "description": "Show Vanta's owned documents"},
             {"command": "vanta_lessons", "description": "Show Vanta's recent lessons"},
             {"command": "vanta_changes", "description": "Show Vanta's recent autonomous changes"},
+            {"command": "vanta_memory", "description": "Inspect Vanta's stored memory and working state"},
             {"command": "vanta_review", "description": "Show the latest Vanta review"},
             {"command": "vanta_scorecard", "description": "Show Vanta's self-evaluation summary"},
             {"command": "scorecards", "description": "Show agent effectiveness scorecards"},

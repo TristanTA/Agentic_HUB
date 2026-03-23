@@ -169,6 +169,8 @@ class AgentContext(BaseModel):
     resolved_skills: list[str]
     workspace_path: str
     agent_id: str | None = None
+    conversation_history: str = ""
+    system_context: str = ""
 
 
 class ToolResult(BaseModel):
@@ -364,3 +366,27 @@ class VantaChangeRecord(BaseModel):
     source: str = "vanta"
     applied_at: datetime = Field(default_factory=utc_now)
     rolled_back_at: datetime | None = None
+    evaluated_at: datetime | None = None
+    evaluation_note: str = ""
+
+
+class MemoryItem(BaseModel):
+    memory_id: str
+    scope: str
+    key: str
+    value: str
+    kind: str
+    agent_id: str
+    thread_id: str | None = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class ThreadWorkingState(BaseModel):
+    state_id: str
+    thread_id: str
+    agent_id: str
+    goal: str = ""
+    missing_information: list[str] = Field(default_factory=list)
+    resolved_information: list[str] = Field(default_factory=list)
+    next_step: str = ""
+    updated_at: datetime = Field(default_factory=utc_now)

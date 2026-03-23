@@ -161,6 +161,16 @@ class ControlPlaneService:
     def vanta_changes(self, limit: int = 10) -> dict:
         return {"status": "ok", "changes": [change.model_dump(mode="json") for change in self.store.list_vanta_changes(limit=limit)]}
 
+    def vanta_memory(self, thread_id: str | None = None) -> dict:
+        agent_id = "vanta_manager"
+        memories = self.store.list_memory_items(agent_id=agent_id, thread_id=thread_id, limit=20)
+        state = self.store.get_thread_working_state(thread_id=thread_id, agent_id=agent_id) if thread_id else None
+        return {
+            "status": "ok",
+            "memory_items": [item.model_dump(mode="json") for item in memories],
+            "working_state": state.model_dump(mode="json") if state else None,
+        }
+
     def rollback_change(self, change_id: str) -> dict:
         change = self.store.get_vanta_change(change_id)
         if change is None:
@@ -442,6 +452,8 @@ class ControlPlaneService:
             return self.vanta_lessons(limit=int(command.options.get("limit", "10")))
         if command.name == "vanta_changes":
             return self.vanta_changes(limit=int(command.options.get("limit", "10")))
+        if command.name == "vanta_memory":
+            return self.vanta_memory(thread_id=command.options.get("thread_id"))
         if command.name == "vanta_status":
             return self.vanta_status()
         if command.name == "vanta_focus":
@@ -639,6 +651,11 @@ class ControlPlaneService:
             if not changes:
                 return "No Vanta changes recorded."
             return "\n".join(f"{item['change_id']} | {item['target_path']} | {item['reason']}" for item in changes[:5])
+        if "memory_items" in result:
+            memory_lines = [f"{item['kind']}: {item['value']}" for item in result["memory_items"][:8]]
+            state = result.get("working_state")
+            state_line = f"Working state: {state}" if state else "Working state: none"
+            return "\n".join(memory_lines + [state_line]) if memory_lines else state_line
         if "last_review" in result or "current_focus" in result:
             recent = result.get("recent_changes", [])
             recent_summary = ", ".join(item["change_id"] for item in recent) if recent else "none"

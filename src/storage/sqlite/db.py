@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from shared.schemas import AgentTaskRecord, ManagementAction, RunTrace, VantaChangeRecord, VantaLesson, VantaReviewCycle
+from shared.schemas import AgentTaskRecord, ManagementAction, MemoryItem, RunTrace, ThreadWorkingState, VantaChangeRecord, VantaLesson, VantaReviewCycle
 
 
 class SQLiteStore:
@@ -100,7 +100,37 @@ class SQLiteStore:
                     new_content TEXT NOT NULL,
                     source TEXT NOT NULL,
                     applied_at TEXT NOT NULL,
-                    rolled_back_at TEXT
+                    rolled_back_at TEXT,
+                    evaluated_at TEXT,
+                    evaluation_note TEXT NOT NULL DEFAULT ''
+                );
+                CREATE TABLE IF NOT EXISTS conversation_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    thread_id TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    text TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS memory_items (
+                    memory_id TEXT PRIMARY KEY,
+                    scope TEXT NOT NULL,
+                    key TEXT NOT NULL,
+                    value TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    thread_id TEXT,
+                    created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS thread_working_state (
+                    state_id TEXT PRIMARY KEY,
+                    thread_id TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    goal TEXT NOT NULL,
+                    missing_information_json TEXT NOT NULL,
+                    resolved_information_json TEXT NOT NULL,
+                    next_step TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 );
                 """
             )
@@ -439,8 +469,8 @@ class SQLiteStore:
                 """
                 INSERT OR REPLACE INTO vanta_changes (
                     change_id, target_type, target_path, reason, previous_content,
-                    new_content, source, applied_at, rolled_back_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    new_content, source, applied_at, rolled_back_at, evaluated_at, evaluation_note
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     change.change_id,
@@ -452,6 +482,8 @@ class SQLiteStore:
                     change.source,
                     change.applied_at.isoformat(),
                     change.rolled_back_at.isoformat() if change.rolled_back_at else None,
+                    change.evaluated_at.isoformat() if change.evaluated_at else None,
+                    change.evaluation_note,
                 ),
             )
 
@@ -460,7 +492,7 @@ class SQLiteStore:
             rows = conn.execute(
                 """
                 SELECT change_id, target_type, target_path, reason, previous_content,
-                       new_content, source, applied_at, rolled_back_at
+                       new_content, source, applied_at, rolled_back_at, evaluated_at, evaluation_note
                 FROM vanta_changes
                 ORDER BY applied_at DESC
                 LIMIT ?
@@ -478,6 +510,8 @@ class SQLiteStore:
                 source=row[6],
                 applied_at=row[7],
                 rolled_back_at=row[8],
+                evaluated_at=row[9],
+                evaluation_note=row[10],
             )
             for row in rows
         ]
@@ -487,7 +521,7 @@ class SQLiteStore:
             row = conn.execute(
                 """
                 SELECT change_id, target_type, target_path, reason, previous_content,
-                       new_content, source, applied_at, rolled_back_at
+                       new_content, source, applied_at, rolled_back_at, evaluated_at, evaluation_note
                 FROM vanta_changes
                 WHERE change_id = ?
                 """,
@@ -505,6 +539,8 @@ class SQLiteStore:
             source=row[6],
             applied_at=row[7],
             rolled_back_at=row[8],
+            evaluated_at=row[9],
+            evaluation_note=row[10],
         )
 
     def mark_vanta_change_rolled_back(self, change_id: str, rolled_back_at: str) -> None:
@@ -513,3 +549,136 @@ class SQLiteStore:
                 "UPDATE vanta_changes SET rolled_back_at = ? WHERE change_id = ?",
                 (rolled_back_at, change_id),
             )
+
+    def evaluate_vanta_change(self, change_id: str, evaluated_at: str, evaluation_note: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE vanta_changes SET evaluated_at = ?, evaluation_note = ? WHERE change_id = ?",
+                (evaluated_at, evaluation_note, change_id),
+            )
+
+    def append_conversation_message(self, *, thread_id: str, agent_id: str, role: str, text: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO conversation_messages (thread_id, agent_id, role, text)
+                VALUES (?, ?, ?, ?)
+                """,
+                (thread_id, agent_id, role, text),
+            )
+
+    def list_conversation_messages(self, *, thread_id: str, agent_id: str, limit: int = 12) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT role, text, created_at
+                FROM conversation_messages
+                WHERE thread_id = ? AND agent_id = ?
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (thread_id, agent_id, limit),
+            ).fetchall()
+        return [
+            {"role": row[0], "text": row[1], "created_at": row[2]}
+            for row in reversed(rows)
+        ]
+
+    def upsert_memory_item(self, item: MemoryItem) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO memory_items (
+                    memory_id, scope, key, value, kind, agent_id, thread_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    item.memory_id,
+                    item.scope,
+                    item.key,
+                    item.value,
+                    item.kind,
+                    item.agent_id,
+                    item.thread_id,
+                    item.created_at.isoformat(),
+                ),
+            )
+
+    def list_memory_items(self, *, agent_id: str, kind: str | None = None, thread_id: str | None = None, limit: int = 20) -> list[MemoryItem]:
+        clauses = ["agent_id = ?"]
+        params: list[Any] = [agent_id]
+        if kind:
+            clauses.append("kind = ?")
+            params.append(kind)
+        if thread_id:
+            clauses.append("(thread_id = ? OR thread_id IS NULL)")
+            params.append(thread_id)
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT memory_id, scope, key, value, kind, agent_id, thread_id, created_at
+                FROM memory_items
+                WHERE {' AND '.join(clauses)}
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (*params, limit),
+            ).fetchall()
+        return [
+            MemoryItem(
+                memory_id=row[0],
+                scope=row[1],
+                key=row[2],
+                value=row[3],
+                kind=row[4],
+                agent_id=row[5],
+                thread_id=row[6],
+                created_at=row[7],
+            )
+            for row in rows
+        ]
+
+    def upsert_thread_working_state(self, state: ThreadWorkingState) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO thread_working_state (
+                    state_id, thread_id, agent_id, goal, missing_information_json,
+                    resolved_information_json, next_step, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    state.state_id,
+                    state.thread_id,
+                    state.agent_id,
+                    state.goal,
+                    json.dumps(state.missing_information),
+                    json.dumps(state.resolved_information),
+                    state.next_step,
+                    state.updated_at.isoformat(),
+                ),
+            )
+
+    def get_thread_working_state(self, *, thread_id: str, agent_id: str) -> ThreadWorkingState | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT state_id, thread_id, agent_id, goal, missing_information_json,
+                       resolved_information_json, next_step, updated_at
+                FROM thread_working_state
+                WHERE thread_id = ? AND agent_id = ?
+                """,
+                (thread_id, agent_id),
+            ).fetchone()
+        if not row:
+            return None
+        return ThreadWorkingState(
+            state_id=row[0],
+            thread_id=row[1],
+            agent_id=row[2],
+            goal=row[3],
+            missing_information=json.loads(row[4]),
+            resolved_information=json.loads(row[5]),
+            next_step=row[6],
+            updated_at=row[7],
+        )

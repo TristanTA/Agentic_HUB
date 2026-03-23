@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 import uuid
+from datetime import datetime, timezone
 
 from hub.inputs.normalize import normalize_telegram_payload
 from hub.outputs.telegram import TelegramOutputAdapter
@@ -22,6 +23,7 @@ class VantaOperator:
         recent_lessons = self.runtime.list_vanta_lessons(limit=5)
         control = getattr(self.runtime, "control_plane", None)
         focus_payload = control.vanta_focus() if control is not None else {"focus_area": "agent_effectiveness", "target": "unknown", "reason": ""}
+        recent_changes = self.runtime.store.list_vanta_changes(limit=5)
 
         findings: list[str] = []
         concerns: list[str] = []
@@ -66,6 +68,12 @@ class VantaOperator:
             self.runtime.record_vanta_lesson(lesson)
             lesson_ids.append(lesson.lesson_id)
             actions_taken.append("Recorded a system-stability lesson for Vanta.")
+        for change in recent_changes:
+            if change.rolled_back_at or change.evaluated_at:
+                continue
+            note = "No recent runtime errors after this change." if not recent_errors else "Recent runtime errors still exist after this change."
+            self.runtime.store.evaluate_vanta_change(change.change_id, datetime.now(timezone.utc).isoformat(), note)
+            actions_taken.append(f"Evaluated change {change.change_id}.")
 
         review = VantaReviewCycle(
             review_id=str(uuid.uuid4()),

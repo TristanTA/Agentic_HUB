@@ -53,6 +53,8 @@ class ManagerAgent:
             return f"Usage: /{command.name} <agent_id>"
         if command.name == "rollback_change":
             return "Usage: /rollback_change <change_id>"
+        if command.name == "vanta_memory":
+            return "Usage: /vanta_memory [--thread_id <chat_id>]"
         if command.name in {"status", "health", "reload", "pause", "resume", "restart", "errors", "routes", "scorecards", "vanta_docs", "vanta_lessons", "vanta_changes", "vanta_status", "vanta_focus", "vanta_review", "vanta_scorecard", "agents", "workers", "tasks"}:
             return f"Usage: /{command.name}"
         return f"Unknown management command: /{command.name}"

@@ -105,3 +105,11 @@ def test_vanta_focus_command_returns_target(repo_copy):
 
     assert result["status"] == "ok"
     assert "target" in result
+
+
+def test_vanta_memory_command_returns_memory_state(repo_copy):
+    service = ControlPlaneService(repo_copy)
+    result = service.handle_management_command("/vanta_memory")
+
+    assert result["status"] == "ok"
+    assert "memory_items" in result

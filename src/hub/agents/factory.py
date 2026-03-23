@@ -14,7 +14,13 @@ class HubAgent:
     chain: object
 
     def handle(self, context: AgentContext, event_or_task: str) -> AgentResult:
-        response = self.chain.invoke({"input": event_or_task})
+        response = self.chain.invoke(
+            {
+                "input": event_or_task,
+                "conversation_history": context.conversation_history,
+                "system_context": context.system_context,
+            }
+        )
         return AgentResult(
             agent_id=self.spec.id,
             output_text=str(response),
@@ -29,8 +35,8 @@ class AgentFactory:
     def build(self, spec: AgentSpec, resolved_prompt: str, resolved_skills: list[str]) -> HubAgent:
         skill_block = "\n\n".join(resolved_skills)
         prompt = ChatPromptTemplate.from_template(
-            "{system_prompt}\n\n{skill_block}\n\nUser/Input:\n{input}"
-        ).partial(system_prompt=resolved_prompt, skill_block=skill_block)
+            "{system_prompt}\n\n{skill_block}\n\nSystem Context:\n{system_context}\n\nRecent Conversation:\n{conversation_history}\n\nCurrent Input:\n{input}"
+        ).partial(system_prompt=resolved_prompt, skill_block=skill_block, system_context="", conversation_history="")
         model = self.model_registry.build_runnable(spec.preferred_model)
         chain = prompt | model
         return HubAgent(spec=spec, chain=chain)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import uuid
 from pathlib import Path
@@ -15,7 +16,7 @@ from hub.router.router import DeterministicRouter
 from hub.tasks.service import TaskService
 from hub.tools.builtin import build_builtin_tools
 from hub.workflows.executor import WorkflowExecutor
-from shared.schemas import AgentContext, RouteDecision, RunTrace, TargetType, VantaLesson, VantaReviewCycle, VantaSelfContext
+from shared.schemas import AgentContext, MemoryItem, RouteDecision, RunTrace, TargetType, ThreadWorkingState, VantaLesson, VantaReviewCycle, VantaSelfContext
 from storage.files.repository import FileRepository
 from storage.sqlite.db import SQLiteStore
 
@@ -111,6 +112,11 @@ class HubRuntime:
         start = time.perf_counter()
         run_id = str(uuid.uuid4())
         decision = self.router.route(event)
+        agent_id = decision.target_id if decision.target_id in self.bundle.agents else self.bundle.hub_config.hub.default_agent
+        if self.bundle.agents[agent_id].memory_scope == "session":
+            self.store.append_conversation_message(thread_id=event.thread_id, agent_id=agent_id, role="user", text=event.text)
+        if agent_id == "vanta_manager":
+            self._update_memory_and_state_from_user(event.thread_id, agent_id, event.text)
         context = self._build_context(run_id, event, decision)
         result_text = self._execute(decision, context)
         latency_ms = int((time.perf_counter() - start) * 1000)
@@ -139,6 +145,10 @@ class HubRuntime:
                 "skill_files": trace.skill_files,
             },
         )
+        if self.bundle.agents[agent_id].memory_scope == "session":
+            self.store.append_conversation_message(thread_id=event.thread_id, agent_id=agent_id, role="assistant", text=result_text)
+        if agent_id == "vanta_manager":
+            self._update_working_state_from_assistant(event.thread_id, agent_id, result_text)
         self.telegram_output.send({"thread_id": event.thread_id, "text": result_text})
         return {"run_id": run_id, "output_text": result_text, "route": decision.model_dump()}
 
@@ -155,8 +165,16 @@ class HubRuntime:
             reason="Direct agent runner",
             config_version="v1",
         )
+        if self.bundle.agents[agent_id].memory_scope == "session":
+            self.store.append_conversation_message(thread_id=event.thread_id, agent_id=agent_id, role="user", text=event.text)
+        if agent_id == "vanta_manager":
+            self._update_memory_and_state_from_user(event.thread_id, agent_id, event.text)
         context = self._build_context(run_id, event, decision)
         result_text = self._execute(decision, context)
+        if self.bundle.agents[agent_id].memory_scope == "session":
+            self.store.append_conversation_message(thread_id=event.thread_id, agent_id=agent_id, role="assistant", text=result_text)
+        if agent_id == "vanta_manager":
+            self._update_working_state_from_assistant(event.thread_id, agent_id, result_text)
         (output_adapter or self.telegram_output).send({"thread_id": event.thread_id, "text": result_text})
         return {"run_id": run_id, "output_text": result_text, "route": decision.model_dump()}
 
@@ -167,6 +185,19 @@ class HubRuntime:
         if agent.soul_file:
             soul_text = self.file_repo.read_text(agent.soul_file)
             prompt_text = f"{soul_text}\n\n{prompt_text}"
+        conversation_history = ""
+        if agent.memory_scope == "session":
+            history = self.store.list_conversation_messages(thread_id=event.thread_id, agent_id=agent_id, limit=12)
+            conversation_history = "\n".join(f"{item['role'].upper()}: {item['text']}" for item in history)
+        system_context = self._system_context(agent_id)
+        memory_context = self._memory_context(agent_id=agent_id, thread_id=event.thread_id)
+        working_state = self.store.get_thread_working_state(thread_id=event.thread_id, agent_id=agent_id)
+        if memory_context:
+            system_context = f"{system_context}\n" if system_context else ""
+            system_context += memory_context
+        if working_state is not None:
+            system_context = f"{system_context}\n" if system_context else ""
+            system_context += self._format_working_state(working_state)
         return AgentContext(
             run_id=run_id,
             event=event,
@@ -176,6 +207,8 @@ class HubRuntime:
             resolved_skills=[self.bundle.skills[skill_id].name for skill_id in agent.skill_ids],
             workspace_path=str((self.root_dir / "workspace" / run_id).resolve()),
             agent_id=agent_id,
+            conversation_history=conversation_history,
+            system_context=system_context,
         )
 
     def _build_task_context(self, agent_id: str, goal: str, input_context: str) -> AgentContext:
@@ -210,6 +243,94 @@ class HubRuntime:
                 }
             )
         return sorted(profiles, key=lambda item: item["id"])
+
+    def _system_context(self, agent_id: str) -> str:
+        if agent_id != "vanta_manager":
+            return ""
+        return "\n".join(
+            [
+                "System Map:",
+                "- The hub runtime routes events, executes agents, writes traces, and manages tasks/tools/workflows.",
+                "- The control plane supervises the hub, reads logs/configs directly, edits prompts and skills, and can pause/resume/restart/reload the system.",
+                "- Vanta is the primary manager and autonomous operator.",
+                "- Telegram is both a chat interface and an operator console for management and introspection commands.",
+                "- Vanta's own documents are agents/vanta_manager/soul.md, prompts/agents/vanta_manager.md, agents/vanta_manager/config.yaml, agents/vanta_manager/loadout.yaml, and the vanta_manager entry in configs/agents.yaml.",
+                "- Other agents are registered in configs/agents.yaml and can be reviewed, improved, and delegated work.",
+            ]
+        )
+
+    def _memory_context(self, *, agent_id: str, thread_id: str) -> str:
+        preferences = self.store.list_memory_items(agent_id=agent_id, kind="preference", thread_id=thread_id, limit=5)
+        facts = self.store.list_memory_items(agent_id=agent_id, kind="system_fact", thread_id=thread_id, limit=5)
+        blocks = []
+        if preferences:
+            blocks.append("Stored Preferences:\n" + "\n".join(f"- {item.value}" for item in preferences))
+        if facts:
+            blocks.append("Stored Facts:\n" + "\n".join(f"- {item.value}" for item in facts))
+        return "\n".join(blocks)
+
+    def _format_working_state(self, state: ThreadWorkingState) -> str:
+        return "\n".join(
+            [
+                "Thread Working State:",
+                f"- Goal: {state.goal or 'unknown'}",
+                f"- Missing information: {', '.join(state.missing_information) if state.missing_information else 'none'}",
+                f"- Resolved information: {', '.join(state.resolved_information) if state.resolved_information else 'none'}",
+                f"- Next step: {state.next_step or 'unspecified'}",
+            ]
+        )
+
+    def _update_memory_and_state_from_user(self, thread_id: str, agent_id: str, text: str) -> None:
+        lowered = text.lower()
+        if any(token in lowered for token in ["prefer", "please", "don't", "do not", "challenge me", "be direct", "ask fewer"]):
+            self.store.upsert_memory_item(
+                MemoryItem(
+                    memory_id=str(uuid.uuid4()),
+                    scope="user_preference",
+                    key=f"pref:{abs(hash(text))}",
+                    value=text.strip(),
+                    kind="preference",
+                    agent_id=agent_id,
+                    thread_id=thread_id,
+                )
+            )
+        facts = []
+        if ":" in text and len(text.split(":", 1)[0]) < 40:
+            facts.append(text.strip())
+        if re.search(r"\b(my|the)\b", lowered) and any(token in lowered for token in ["budget", "goal", "project", "deadline", "venue", "agent"]):
+            facts.append(text.strip())
+        for fact in facts[:2]:
+            self.store.upsert_memory_item(
+                MemoryItem(
+                    memory_id=str(uuid.uuid4()),
+                    scope="thread_fact",
+                    key=f"fact:{abs(hash(fact))}",
+                    value=fact,
+                    kind="system_fact",
+                    agent_id=agent_id,
+                    thread_id=thread_id,
+                )
+            )
+        state = self.store.get_thread_working_state(thread_id=thread_id, agent_id=agent_id)
+        if state is None:
+            state = ThreadWorkingState(state_id=str(uuid.uuid4()), thread_id=thread_id, agent_id=agent_id)
+        if not state.goal and len(text.split()) > 3:
+            state.goal = text.strip()
+        state.resolved_information.append(text.strip())
+        state.resolved_information = state.resolved_information[-8:]
+        state.missing_information = [item for item in state.missing_information if item.lower() not in lowered]
+        self.store.upsert_thread_working_state(state)
+
+    def _update_working_state_from_assistant(self, thread_id: str, agent_id: str, text: str) -> None:
+        state = self.store.get_thread_working_state(thread_id=thread_id, agent_id=agent_id)
+        if state is None:
+            state = ThreadWorkingState(state_id=str(uuid.uuid4()), thread_id=thread_id, agent_id=agent_id)
+        questions = re.findall(r"(?:need|missing|provide|send)\s+([a-zA-Z0-9 _-]{3,40})", text.lower())
+        state.missing_information = list(dict.fromkeys((state.missing_information + [item.strip() for item in questions if item.strip()])[-8:]))
+        next_step_match = re.search(r"next step[:\-]\s*(.+)", text, flags=re.IGNORECASE)
+        if next_step_match:
+            state.next_step = next_step_match.group(1).strip()
+        self.store.upsert_thread_working_state(state)
 
     def hub_status(self) -> dict:
         return {
@@ -331,7 +452,16 @@ class HubRuntime:
         return self.model_registry.run_with_tools(
             model_id=spec.preferred_model,
             system_prompt=system_prompt,
-            user_input=context.event.text,
+            user_input=self._compose_user_input(context),
             tools=tool_defs,
             tool_executor=execute_tool,
         )
+
+    def _compose_user_input(self, context: AgentContext) -> str:
+        blocks = []
+        if context.system_context:
+            blocks.append(f"System Context:\n{context.system_context}")
+        if context.conversation_history:
+            blocks.append(f"Recent Conversation:\n{context.conversation_history}")
+        blocks.append(f"Current Input:\n{context.event.text}")
+        return "\n\n".join(blocks)
