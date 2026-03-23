@@ -1,0 +1,17 @@
+from __future__ import annotations
+
+from hub.inputs.normalize import normalize_telegram_payload
+from hub.main import build_runtime
+
+
+def test_echo_fallback_does_not_dump_langchain_message_repr(repo_copy, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    runtime = build_runtime(repo_copy)
+    event = normalize_telegram_payload(
+        {"message": {"message_id": 1, "chat": {"id": "123"}, "text": "plan a launch roadmap for Aria"}}
+    )
+
+    result = runtime.process_event(event)
+
+    assert "HumanMessage(content=" not in result["output_text"]
+    assert "plan a launch roadmap for Aria" in result["output_text"]

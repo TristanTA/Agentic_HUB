@@ -19,12 +19,7 @@ class ModelRegistry:
             return RunnableLambda(lambda payload: self._invoke_openai(spec, payload))
 
         def invoke(payload):
-            if isinstance(payload, str):
-                text = payload
-            elif isinstance(payload, dict):
-                text = payload.get("input") or payload.get("text") or str(payload)
-            else:
-                text = str(payload)
+            text = self._coerce_payload_to_text(payload, prefer_latest_message=True)
             return f"[{spec.model_name}] {text}"
 
         return RunnableLambda(invoke)
@@ -150,11 +145,15 @@ class ModelRegistry:
                     parts.append(content.get("text", ""))
         return "\n".join(part for part in parts if part).strip()
 
-    def _coerce_payload_to_text(self, payload) -> str:
+    def _coerce_payload_to_text(self, payload, *, prefer_latest_message: bool = False) -> str:
         if isinstance(payload, str):
             return payload
         if isinstance(payload, dict):
             return payload.get("input") or payload.get("text") or json.dumps(payload)
+        if prefer_latest_message and hasattr(payload, "to_messages"):
+            messages = payload.to_messages()
+            if messages:
+                return str(messages[-1].content)
         if hasattr(payload, "to_string"):
             return payload.to_string()
         if hasattr(payload, "to_messages"):
