@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+
 from hub.hub import Hub
 
 
@@ -7,8 +9,7 @@ def main():
         hub.run()
     except KeyboardInterrupt:
         hub.request_stop()
-        hub.shutdown()
-
 
 if __name__ == "__main__":
+    load_dotenv()
     main()

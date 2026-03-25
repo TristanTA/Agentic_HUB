@@ -1,6 +1,9 @@
+import os
 import time
 import uuid
 from datetime import timedelta
+
+from dotenv import load_dotenv
 
 from hub.config import DEAD_TASKS_FILE, HEARTBEAT_SECONDS, STATE_FILE, TASKS_FILE
 from hub.dead_task_store import DeadTaskStore
@@ -9,21 +12,33 @@ from hub.logger import get_logger
 from hub.state import HubState
 from hub.task_store import TaskStore
 from hub.tasks import DeadTaskRecord, Task, TaskResult, utc_now
+from hub.core.service_manager import ServiceManager
+from hub.core.command_handlers import CommandHandlers
+from hub.core.task_types import HubTask
+from hub.integrations.telegram_service import TelegramPollingService
 import hub.handlers as handlers
 
 
 class Hub:
     def __init__(self):
+        load_dotenv()
+
         self.logger = get_logger()
         self.state = HubState()
+        self.service_manager = ServiceManager()
+
+        self._register_services()
 
         self.executor = Executor(
             handlers={
                 "startup_task": handlers.startup_task,
+                "start_service_task": lambda payload: handlers.start_service_task(payload, hub=self),
                 "interval_task": handlers.interval_task,
             },
             logger=self.logger,
         )
+
+        self.command_handlers = CommandHandlers(self)
 
         self.task_store = TaskStore(TASKS_FILE)
         self.dead_task_store = DeadTaskStore(DEAD_TASKS_FILE)
@@ -34,9 +49,33 @@ class Hub:
             self.tasks = self._default_tasks()
             self.task_store.save(self.tasks)
 
+    def _register_services(self) -> None:
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        allowed_raw = os.getenv("TELEGRAM_ALLOWED_USER_IDS", "")
+
+        allowed_user_ids = {
+            int(x.strip()) for x in allowed_raw.split(",") if x.strip()
+        }
+
+        if not bot_token:
+            self.logger.warning("TELEGRAM_BOT_TOKEN not set; telegram service not registered")
+            return
+
+        telegram = TelegramPollingService(
+            hub=self,
+            bot_token=bot_token,
+            allowed_user_ids=allowed_user_ids,
+        )
+        self.service_manager.register(
+            "telegram",
+            telegram,
+            metadata={"transport": "telegram"},
+        )
+        self.logger.info("Registered service: telegram")
+
     def _default_tasks(self) -> list[Task]:
         now = utc_now()
-        return [
+        tasks = [
             Task(
                 id=str(uuid.uuid4()),
                 name="Startup Task",
@@ -48,7 +87,7 @@ class Hub:
                 id=str(uuid.uuid4()),
                 name="Interval Task",
                 handler_name="interval_task",
-                priority=2,
+                priority=3,
                 trigger="interval",
                 interval_seconds=30,
                 next_run_at=now,
@@ -56,6 +95,23 @@ class Hub:
                 retry_delay_seconds=10,
             ),
         ]
+
+        if "telegram" in self.service_manager._services:
+            tasks.insert(
+                1,
+                Task(
+                    id=str(uuid.uuid4()),
+                    name="Start Telegram Service",
+                    handler_name="start_service_task",
+                    priority=2,
+                    trigger="startup",
+                    payload={"service_name": "telegram"},
+                    max_retries=3,
+                    retry_delay_seconds=10,
+                ),
+            )
+
+        return tasks
 
     def run(self):
         self.state.status = "running"
@@ -142,10 +198,21 @@ class Hub:
             task.name,
         )
 
+    def submit_and_run_task(self, task: HubTask) -> dict:
+        command = task.payload["command"]
+        text = self.command_handlers.handle(command, task.payload)
+        return {"text": text}
+
     def request_stop(self):
         self.state.stop_requested = True
 
     def shutdown(self):
+        for service_name in list(self.service_manager._services.keys()):
+            try:
+                self.service_manager.stop(service_name)
+            except Exception as exc:
+                self.logger.error("Failed to stop service %s: %s", service_name, exc)
+
         self.state.status = "stopped"
         self.state.save(STATE_FILE)
         self.task_store.save(self.tasks)
