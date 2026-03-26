@@ -1,272 +1,401 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from hub.core.command_spec import CREATE_FIELDS, KIND_LABELS, OBJECT_KINDS
+from hub.core.command_state import CommandSession
 from hub.runtime_status import build_runtime_status
+from hub.tasks import Task, utc_now
 
 
 class CommandHandlers:
     def __init__(self, hub: Any) -> None:
         self.hub = hub
+        self._sessions: dict[str, CommandSession] = {}
 
     def handle(self, command: str, payload: dict[str, Any]) -> str:
         command = command.strip()
+        session_key = self._session_key(payload)
+        if session_key in self._sessions and (not command.startswith("/") or command.lower() in {"confirm", "cancel", "back"}):
+            return self._handle_session_input(session_key, command)
+
         normalized = command.split(maxsplit=1)[0].lower() if command else ""
-
         if normalized == "/ping":
-            return "hub alive"
-
-        if normalized == "/status":
-            return self._status()
-
-        if normalized == "/tasks":
-            return self._tasks()
-
-        if normalized == "/services":
-            return self._services()
-
+            return self._render("Hub alive", [], ["/status", "/workers", "/help"])
         if normalized == "/help":
             return self._help()
-
+        if normalized == "/status":
+            return self._status()
+        if normalized == "/inspect":
+            return self._inspect(command)
+        if normalized == "/workers":
+            return self._catalog_list("workers")
+        if normalized == "/tools":
+            return self._catalog_list("tools")
+        if normalized == "/loadouts":
+            return self._catalog_list("loadouts")
+        if normalized == "/roles":
+            return self._catalog_list("worker_roles")
+        if normalized == "/types":
+            return self._catalog_list("worker_types")
+        if normalized == "/tasks":
+            return self._tasks()
+        if normalized == "/logs":
+            return self._logs()
+        if normalized == "/new":
+            return self._start_session(session_key, "new")
+        if normalized == "/edit":
+            return self._start_session(session_key, "edit")
+        if normalized == "/delete":
+            return self._start_session(session_key, "delete")
+        if normalized == "/pause":
+            return self._pause(command)
+        if normalized == "/resume":
+            return self._resume(command)
+        if normalized == "/retry":
+            return self._retry(command)
+        if normalized == "/services":
+            return self._services()
         if normalized == "/runtime":
             return self._runtime()
-
         if normalized == "/catalog":
             return self._catalog(command)
+        return self._render(f"Unknown command: {normalized or command}", ["Command not recognized."], ["/help", "/status", "/inspect"])
 
-        return f"unknown command: {normalized or command}"
+    def _session_key(self, payload: dict[str, Any]) -> str:
+        return f"{payload.get('source', 'local')}:{payload.get('chat_id', 'default')}:{payload.get('user_id', 'anon')}"
+
+    def _start_session(self, session_key: str, mode: str) -> str:
+        self._sessions[session_key] = CommandSession(mode=mode, step="kind")
+        rows = [f"[{idx}] {KIND_LABELS[kind]} | {kind}" for idx, kind in enumerate(OBJECT_KINDS, start=1)]
+        return self._render(f"{mode.title()} wizard", ["Choose object type:", *rows], ["reply with number or kind", "cancel"])
+
+    def _handle_session_input(self, session_key: str, command: str) -> str:
+        session = self._sessions[session_key]
+        lowered = command.strip().lower()
+        if lowered == "cancel":
+            del self._sessions[session_key]
+            return self._render("Wizard cancelled", [], ["/help", "/new"])
+        if lowered == "back":
+            session.step = "kind"
+            session.kind = None
+            session.object_id = None
+            session.draft.clear()
+            return self._start_session(session_key, session.mode)
+
+        if session.step == "kind":
+            kind = self._resolve_kind(command)
+            if not kind:
+                return self._render("Invalid target", ["Reply with a valid object type or list number."], ["reply again", "cancel"])
+            session.kind = kind
+            session.step = "object" if session.mode in {"edit", "delete"} else "payload"
+            if session.mode == "new":
+                required = ", ".join(CREATE_FIELDS[kind])
+                return self._render(f"Create {KIND_LABELS[kind]}", [f"Reply with a JSON object including: {required}"], ["reply with JSON", "back", "cancel"])
+            rows = self._list_rows(kind)
+            return self._render(f"Select {KIND_LABELS[kind]}", rows or ["No objects available."], ["reply with number or id", "back", "cancel"])
+
+        if session.step == "object":
+            object_id = self._resolve_object_id(session.kind or "", command)
+            if not object_id:
+                return self._render("Unknown object", ["Reply with a list number or object id."], ["reply again", "back", "cancel"])
+            session.object_id = object_id
+            session.step = "confirm" if session.mode == "delete" else "payload"
+            if session.mode == "delete":
+                deps = self._dependency_lines(session.kind or "", object_id)
+                return self._render(f"Delete {KIND_LABELS[session.kind or 'object']}", [f"Target: {object_id}", *deps], ["confirm", "back", "cancel"])
+            return self._render(
+                f"Edit {KIND_LABELS[session.kind or 'object']}",
+                [f"Target: {object_id}", "Reply with a JSON object of fields to update."],
+                ["reply with JSON", "back", "cancel"],
+            )
+
+        if session.step == "payload":
+            try:
+                session.draft = json.loads(command)
+            except json.JSONDecodeError as exc:
+                return self._render("Invalid JSON", [str(exc)], ["reply again", "back", "cancel"])
+            session.step = "confirm"
+            preview = [f"{key}: {value}" for key, value in session.draft.items()]
+            return self._render("Preview changes", preview, ["confirm", "back", "cancel"])
+
+        if session.step == "confirm":
+            if lowered != "confirm":
+                return self._render("Confirmation required", ["Reply with `confirm` to continue."], ["confirm", "back", "cancel"])
+            result = self._commit_session(session)
+            del self._sessions[session_key]
+            return result
+
+        del self._sessions[session_key]
+        return self._render("Wizard reset", ["Session state was invalid and has been cleared."], ["/help"])
+
+    def _commit_session(self, session: CommandSession) -> str:
+        kind = session.kind or ""
+        if session.mode == "new":
+            object_id = self._create_object(kind, session.draft)
+            return self._render(f"Created {KIND_LABELS[kind]}", [f"Object id: {object_id}"], [f"/inspect {kind} {object_id}", "/edit", "/delete"])
+        if session.mode == "edit":
+            self._edit_object(kind, session.object_id or "", session.draft)
+            return self._render(f"Updated {KIND_LABELS[kind]}", [f"Object id: {session.object_id}", f"Changed fields: {', '.join(session.draft.keys())}"], [f"/inspect {kind} {session.object_id}", "/logs"])
+        if session.mode == "delete":
+            self._delete_object(kind, session.object_id or "")
+            return self._render(f"Delete flow complete for {KIND_LABELS[kind]}", [f"Target: {session.object_id}"], ["/logs", "/help"])
+        return self._render("Wizard failed", ["Unsupported session mode."], ["/help"])
+
+    def _help(self) -> str:
+        return self._render(
+            "Hub command guide",
+            [
+                "Commands:",
+                "/help, /new, /edit, /delete",
+                "/workers, /tasks, /status, /inspect, /logs",
+                "/tools, /loadouts, /roles, /types",
+                "/pause, /resume, /retry",
+                "Common objects: workers, worker_roles, worker_types, tools, loadouts, tasks",
+                "Example flow: /workers -> /inspect workers aria -> /edit",
+            ],
+            ["/status", "/workers", "/new"],
+        )
 
     def _status(self) -> str:
         now = datetime.now(timezone.utc)
-
-        queued = 0
-        running = 0
-        done = 0
-        failed = 0
-
-        startup_pending = 0
-        interval_enabled = 0
-        due = 0
-        success = 0
-        never_run = 0
-
-        for t in self.hub.tasks:
-            # Old HubTask shape used in tests
-            if hasattr(t, "status"):
-                status = getattr(t, "status", None)
-                if status == "queued":
-                    queued += 1
-                elif status == "running":
-                    running += 1
-                elif status == "done":
-                    done += 1
-                elif status == "failed":
-                    failed += 1
-                continue
-
-            # Real Task shape used by hub runtime
-            enabled = getattr(t, "enabled", True)
-            if not enabled:
-                continue
-
-            trigger = getattr(t, "trigger", None)
-            last_status = getattr(t, "last_status", None)
-            next_run_at = getattr(t, "next_run_at", None)
-            task_id = getattr(t, "id", None)
-
-            if trigger == "startup" and task_id not in getattr(self.hub, "ran_startup_ids", set()):
-                startup_pending += 1
-
-            if trigger == "interval":
-                interval_enabled += 1
-                if next_run_at is not None and now >= next_run_at:
-                    due += 1
-
-            if last_status == "failed":
-                failed += 1
-            elif last_status == "success":
-                success += 1
-            elif last_status is None:
-                never_run += 1
-
-        # Preserve old test expectations if HubTask-style objects are present
-        if queued or running or done or failed:
-            return (
-                "hub status\n"
-                f"- queued: {queued}\n"
-                f"- running: {running}\n"
-                f"- done: {done}\n"
-                f"- failed: {failed}"
-            )
-
-        return (
-            "hub status\n"
-            f"- state: {getattr(self.hub.state, 'status', 'unknown')}\n"
-            f"- startup pending: {startup_pending}\n"
-            f"- interval enabled: {interval_enabled}\n"
-            f"- due now: {due}\n"
-            f"- last success: {success}\n"
-            f"- last failed: {failed}\n"
-            f"- never run: {never_run}"
-        )
-
-    def _tasks(self) -> str:
-        if not self.hub.tasks:
-            return "no tasks"
-
-        recent = self.hub.tasks[-10:]
-        lines = ["recent tasks:"]
-
-        for t in recent:
-            # Old HubTask shape used in tests
-            if hasattr(t, "task_id"):
-                lines.append(
-                    f"- {t.task_id} | {t.kind} | {t.status}"
-                )
-                continue
-
-            # Real Task shape
-            lines.append(
-                f"- {getattr(t, 'id', '?')} | {getattr(t, 'name', '?')} | "
-                f"trigger={getattr(t, 'trigger', '?')} | "
-                f"enabled={getattr(t, 'enabled', '?')} | "
-                f"last_status={getattr(t, 'last_status', None)}"
-            )
-
-        return "\n".join(lines)
-
-    def _services(self) -> str:
-        rows = self.hub.service_manager.list_status()
-        if not rows:
-            return "no services registered"
-
-        lines = ["services:"]
-        for row in rows:
-            lines.append(f"- {row['name']} | {row['state']}")
-        return "\n".join(lines)
-
-    def _help(self) -> str:
-        return "\n".join([
-            "commands:",
-            "/ping",
-            "/status",
-            "/tasks",
-            "/services",
-            "/runtime",
-            "/catalog ...",
-            "/help",
-        ])
+        failed = sum(getattr(t, "last_status", None) == "failed" or getattr(t, "status", None) == "failed" for t in self.hub.tasks)
+        scheduled = sum(getattr(t, "trigger", None) in {"interval", "once"} for t in self.hub.tasks)
+        overdue = sum(getattr(t, "next_run_at", None) is not None and now >= t.next_run_at for t in self.hub.tasks if getattr(t, "trigger", None) in {"interval", "once"})
+        worker_registry = getattr(self.hub, "worker_registry", None)
+        workers = worker_registry.list_workers() if worker_registry is not None else []
+        enabled = [w for w in workers if w.enabled]
+        errors = [w for w in workers if w.health != "healthy"]
+        running = [w for w in workers if w.status == "running"]
+        state = getattr(getattr(self.hub, "state", None), "status", "unknown")
+        lines = [
+            f"Hub: {state}",
+            f"Workers: {len(workers)} total | {len(enabled)} enabled | {len(running)} running | {len(errors)} error",
+            f"Tasks: {len(self.hub.tasks)} total | {failed} failed | {scheduled} scheduled",
+            f"Scheduler: {'paused' if getattr(self.hub, 'scheduler_paused', False) else 'running'}",
+            f"Overdue scheduled tasks: {overdue}",
+        ]
+        return self._render("Operational status", lines, ["/workers", "/tasks", "/logs"])
 
     def _runtime(self) -> str:
-        return build_runtime_status(
-            self.hub.event_log,
-            self.hub.artifact_store,
-            self.hub.approval_manager,
-            self.hub.catalog_manager,
-        )
+        lines = build_runtime_status(self.hub.event_log, self.hub.artifact_store, self.hub.approval_manager, self.hub.catalog_manager).splitlines()
+        return self._render("Runtime status", lines[1:], ["/status", "/workers", "/tools"])
+
+    def _services(self) -> str:
+        rows = [f"[{idx}] {row['name']} | {row['state']} | service" for idx, row in enumerate(self.hub.service_manager.list_status(), start=1)]
+        return self._render("Services", rows or ["No services registered."], ["/status", "/help"])
+
+    def _tasks(self) -> str:
+        return self._render("Tasks", [self._task_row(idx, task) for idx, task in enumerate(self.hub.tasks, start=1)] or ["No tasks available."], ["/inspect tasks <id>", "/retry <task_id>", "/delete"])
+
+    def _logs(self) -> str:
+        rows = [f"[{idx}] {event.created_at.isoformat()} | info | {event.event_type} | task={event.task_id or '-'} | worker={event.worker_id or '-'}" for idx, event in enumerate(self.hub.event_log.list_all()[-10:], start=1)]
+        return self._render("Recent logs", rows or ["No recent logs."], ["/inspect tasks <id>", "/retry <task_id>", "/status"])
+
+    def _catalog_list(self, kind: str) -> str:
+        title = {"workers": "Workers", "tools": "Tools", "loadouts": "Loadouts", "worker_roles": "Roles", "worker_types": "Worker types"}[kind]
+        return self._render(title, self._list_rows(kind) or ["No objects available."], [f"/inspect {kind} <id>", "/edit", "/delete"])
+
+    def _inspect(self, command: str) -> str:
+        parts = command.split(maxsplit=2)
+        if len(parts) < 3:
+            return self._render("Inspect command", ["Usage: /inspect <kind> <id>"], ["/workers", "/tasks", "/tools"])
+        kind = self._resolve_kind(parts[1])
+        object_id = parts[2].strip()
+        if not kind:
+            return self._render("Unknown kind", ["Inspect target type not recognized."], ["/help"])
+        data = self._inspect_data(kind, object_id)
+        if not data:
+            return self._render("Object not found", [f"No {kind} matched `{object_id}`."], ["/help", "/workers", "/tasks"])
+        deps = self._dependency_lines(kind, data["id"])
+        body = ["Summary:"] + [f"- {key}: {value}" for key, value in data.items()]
+        if deps:
+            body += ["Dependencies:"] + [f"- {line}" for line in deps]
+        return self._render(f"Inspect {KIND_LABELS.get(kind, kind)} {data['id']}", body, ["/edit", "/delete", "/logs"])
+
+    def _pause(self, command: str) -> str:
+        parts = command.split()
+        if len(parts) >= 3 and parts[1].lower() == "worker":
+            self.hub.catalog_manager.update("workers", parts[2], {"status": "paused"})
+            return self._render("Worker paused", [f"Worker: {parts[2]}"], ["/resume worker " + parts[2], "/workers"])
+        self.hub.state.status = "paused"
+        return self._render("Hub paused", ["Hub state has been set to paused."], ["/resume hub", "/status"])
+
+    def _resume(self, command: str) -> str:
+        parts = command.split()
+        if len(parts) >= 3 and parts[1].lower() == "worker":
+            self.hub.catalog_manager.update("workers", parts[2], {"status": "enabled"})
+            return self._render("Worker resumed", [f"Worker: {parts[2]}"], ["/workers", "/inspect workers " + parts[2]])
+        self.hub.state.status = "running"
+        return self._render("Hub resumed", ["Hub state has been set to running."], ["/status", "/workers"])
+
+    def _retry(self, command: str) -> str:
+        parts = command.split()
+        if len(parts) < 2:
+            failed = [task for task in self.hub.tasks if getattr(task, "last_status", None) == "failed"]
+            return self._render("Retryable tasks", [self._task_row(idx, task) for idx, task in enumerate(failed, start=1)] or ["No failed tasks available."], ["/retry <task_id>", "/tasks"])
+        task = self._find_task(parts[1])
+        if not task:
+            return self._render("Unknown task", ["Task not found."], ["/tasks", "/logs"])
+        cloned = Task(id=str(uuid.uuid4()), name=f"{task.name} (retry)", handler_name=task.handler_name, priority=task.priority, enabled=True, trigger="once", next_run_at=utc_now(), payload=dict(task.payload))
+        self.hub.tasks.append(cloned)
+        self.hub.task_store.save(self.hub.tasks)
+        return self._render("Retry launched", [f"Original task: {parts[1]}", f"New task id: {cloned.id}"], [f"/inspect tasks {cloned.id}", "/tasks"])
 
     def _catalog(self, command: str) -> str:
         parts = command.split(maxsplit=3)
-        if len(parts) == 1:
-            return self._catalog_help()
+        try:
+            if len(parts) == 1:
+                return self._render("Catalog commands", ["/catalog list <kind>", "/catalog create <kind> <json>", "/catalog update <kind> <id> <json>", "/catalog enable <tools|workers> <id>", "/catalog disable <tools|workers> <id>", "/catalog assign worker <worker_id> <type|role|loadout> <value>", "/catalog import <path> [--override]", "/catalog export <path>"], ["/help", "/new"])
+            if parts[1] == "list":
+                return self._render("Catalog list", self._list_rows(parts[2]), [f"/inspect {parts[2]} <id>", "/edit", "/delete"])
+            if parts[1] == "create":
+                object_id = self.hub.catalog_manager.upsert(parts[2], json.loads(parts[3]))
+                return self._render("Catalog object created", [f"Kind: {parts[2]}", f"Object id: {object_id}"], [f"/inspect {parts[2]} {object_id}", "/edit"])
+            if parts[1] == "update":
+                object_id, raw_updates = parts[3].split(maxsplit=1)
+                self.hub.catalog_manager.update(parts[2], object_id, json.loads(raw_updates))
+                return self._render("Catalog object updated", [f"Kind: {parts[2]}", f"Object id: {object_id}"], [f"/inspect {parts[2]} {object_id}", "/logs"])
+            if parts[1] in {"enable", "disable"}:
+                self.hub.catalog_manager.set_enabled(parts[2], parts[3], parts[1] == "enable")
+                return self._render(f"{parts[1].title()} complete", [f"Kind: {parts[2]}", f"Object id: {parts[3]}"], [f"/inspect {parts[2]} {parts[3]}", "/help"])
+            if parts[1] == "assign":
+                worker_id, target, value = parts[3].split()
+                self.hub.catalog_manager.assign_worker(worker_id, {"type": "type_id", "role": "role_id", "loadout": "loadout_id"}[target], value)
+                return self._render("Worker assignment updated", [f"Worker: {worker_id}", f"{target}: {value}"], [f"/inspect workers {worker_id}", "/workers"])
+            if parts[1] == "import":
+                arg_parts = command.split()[2:]
+                allow_override = "--override" in arg_parts
+                path = Path(next(part for part in arg_parts if part != "--override"))
+                counts = self.hub.catalog_manager.import_package(path, allow_override=allow_override)
+                return self._render("Package imported", [f"Path: {path}", *[f"{kind}: {count}" for kind, count in counts.items()]], ["/workers", "/tools", "/loadouts"])
+            if parts[1] == "export":
+                exported = self.hub.catalog_manager.export_package(Path(command.split(maxsplit=2)[2]))
+                return self._render("Package exported", [f"Path: {exported}"], ["/catalog list workers", "/help"])
+        except Exception as exc:
+            return self._render("Catalog command failed", [str(exc)], ["/help", "/logs"])
+        return self._render("Catalog command", ["Unknown catalog subcommand."], ["/help", "/catalog"])
 
-        action = parts[1]
-        if action == "list":
-            if len(parts) < 3:
-                return "usage: /catalog list <tools|worker_types|worker_roles|loadouts|memory_policies|workers>"
-            kind = parts[2]
-            items = self.hub.catalog_manager.list_objects(kind)
-            if not items:
-                return f"no {kind}"
-            lines = [f"{kind}:"]
-            for item in items:
-                identifier = self._catalog_identifier(kind, item)
-                lines.append(f"- {identifier} | source={getattr(item, 'source', 'runtime')}")
-            return "\n".join(lines)
+    def _resolve_kind(self, raw: str) -> str | None:
+        mapping = {"worker": "workers", "workers": "workers", "role": "worker_roles", "roles": "worker_roles", "worker_roles": "worker_roles", "type": "worker_types", "types": "worker_types", "worker_types": "worker_types", "tool": "tools", "tools": "tools", "loadout": "loadouts", "loadouts": "loadouts", "task": "tasks", "tasks": "tasks"}
+        value = raw.strip().lower()
+        if value.isdigit():
+            index = int(value) - 1
+            return OBJECT_KINDS[index] if 0 <= index < len(OBJECT_KINDS) else None
+        return mapping.get(value)
 
-        if action == "create":
-            if len(parts) < 4:
-                return "usage: /catalog create <kind> <json>"
-            kind = parts[2]
-            payload = json.loads(parts[3])
-            object_id = self.hub.catalog_manager.upsert(kind, payload)
-            return f"created {kind} {object_id}"
+    def _resolve_object_id(self, kind: str, raw: str) -> str | None:
+        if kind == "tasks":
+            task = self._find_task(raw) if not raw.isdigit() else (self.hub.tasks[int(raw) - 1] if 0 < int(raw) <= len(self.hub.tasks) else None)
+            return getattr(task, "id", None) if task else None
+        items = self.hub.catalog_manager.list_objects(kind)
+        if raw.isdigit():
+            return self._catalog_identifier(kind, items[int(raw) - 1]) if 0 < int(raw) <= len(items) else None
+        return raw if any(self._catalog_identifier(kind, item) == raw for item in items) else None
 
-        if action == "update":
-            if len(parts) < 4:
-                return "usage: /catalog update <kind> <id> <json>"
-            extra = parts[3].split(maxsplit=1)
-            if len(extra) != 2:
-                return "usage: /catalog update <kind> <id> <json>"
-            kind = parts[2]
-            object_id, raw_updates = extra
-            updates = json.loads(raw_updates)
-            self.hub.catalog_manager.update(kind, object_id, updates)
-            return f"updated {kind} {object_id}"
+    def _list_rows(self, kind: str) -> list[str]:
+        if kind == "tasks":
+            return [self._task_row(idx, task) for idx, task in enumerate(self.hub.tasks, start=1)]
+        rows = []
+        for idx, item in enumerate(self.hub.catalog_manager.list_objects(kind), start=1):
+            identifier = self._catalog_identifier(kind, item)
+            name = getattr(item, "name", identifier)
+            status = ("enabled" if getattr(item, "enabled", False) else "disabled") if kind in {"workers", "tools"} else getattr(item, "status", "active")
+            refs = f"{item.type_id}/{item.role_id}" if kind == "workers" else (f"tools={len(item.allowed_tool_ids)}" if kind == "loadouts" else getattr(item, "purpose", getattr(item, "execution_mode", getattr(item, "safety_level", "-"))))
+            rows.append(f"[{idx}] {name} | {identifier} | {status} | {refs}")
+        return rows
 
-        if action in {"enable", "disable"}:
-            if len(parts) < 4:
-                return "usage: /catalog enable|disable <tools|workers> <id>"
-            kind = parts[2]
-            object_id = parts[3]
-            self.hub.catalog_manager.set_enabled(kind, object_id, action == "enable")
-            return f"{action}d {kind} {object_id}"
+    def _inspect_data(self, kind: str, object_id: str) -> dict[str, Any]:
+        resolved_id = self._resolve_object_id(kind, object_id)
+        if not resolved_id:
+            return {}
+        if kind == "tasks":
+            task = self._find_task(resolved_id)
+            if not task:
+                return {}
+            return {
+                "id": getattr(task, "id", getattr(task, "task_id", "?")),
+                "name": getattr(task, "name", getattr(task, "kind", "?")),
+                "kind": getattr(task, "handler_name", getattr(task, "kind", "?")),
+                "status": getattr(task, "last_status", getattr(task, "status", "queued")) or "queued",
+                "created_at": getattr(task, "next_run_at", getattr(task, "created_at", None)),
+                "updated_at": getattr(task, "last_run_at", None),
+                "priority": getattr(task, "priority", None),
+                "payload": getattr(task, "payload", {}),
+                "retry_count": getattr(task, "retry_count", 0),
+                "last_error": getattr(task, "last_error", getattr(task, "error", None)),
+            }
+        item = next(item for item in self.hub.catalog_manager.list_objects(kind) if self._catalog_identifier(kind, item) == resolved_id)
+        data = item.model_dump(mode="python")
+        data["id"] = resolved_id
+        data["kind"] = kind
+        data.setdefault("status", "enabled" if getattr(item, "enabled", False) else "active")
+        return data
 
-        if action == "assign":
-            if len(parts) < 4:
-                return "usage: /catalog assign worker <worker_id> <type|role|loadout> <value>"
-            extra = parts[3].split()
-            if parts[2] != "worker" or len(extra) != 3:
-                return "usage: /catalog assign worker <worker_id> <type|role|loadout> <value>"
-            worker_id, target, value = extra
-            mapping = {"type": "type_id", "role": "role_id", "loadout": "loadout_id"}
-            self.hub.catalog_manager.assign_worker(worker_id, mapping[target], value)
-            return f"assigned worker {worker_id} {target}={value}"
+    def _dependency_lines(self, kind: str, object_id: str) -> list[str]:
+        return [] if kind == "tasks" else self.hub.catalog_manager.dependency_summary(kind, object_id)
 
-        if action == "import":
-            if len(parts) < 3:
-                return "usage: /catalog import <path> [--override]"
-            arg_parts = command.split()[2:]
-            allow_override = "--override" in arg_parts
-            path = Path(next(part for part in arg_parts if part != "--override"))
-            counts = self.hub.catalog_manager.import_package(path, allow_override=allow_override)
-            summary = ", ".join(f"{kind}={count}" for kind, count in counts.items() if count)
-            return f"imported package from {path}: {summary or 'no objects'}"
+    def _create_object(self, kind: str, draft: dict[str, Any]) -> str:
+        if kind == "tasks":
+            task = Task(id=str(uuid.uuid4()), name=str(draft["name"]), handler_name=str(draft["handler_name"]), priority=int(draft["priority"]), enabled=bool(draft.get("enabled", True)), trigger=str(draft["trigger"]), interval_seconds=draft.get("interval_seconds"), next_run_at=utc_now(), payload=dict(draft.get("payload", {})))
+            self.hub.tasks.append(task)
+            self.hub.task_store.save(self.hub.tasks)
+            return task.id
+        field = {"workers": "worker_id", "worker_roles": "role_id", "worker_types": "type_id", "tools": "tool_id", "loadouts": "loadout_id"}[kind]
+        payload = dict(draft)
+        payload[field] = self._slugify(str(draft["name"]))
+        return self.hub.catalog_manager.upsert(kind, payload)
 
-        if action == "export":
-            if len(parts) < 3:
-                return "usage: /catalog export <path>"
-            path = Path(command.split(maxsplit=2)[2])
-            exported = self.hub.catalog_manager.export_package(path)
-            return f"exported package to {exported}"
+    def _edit_object(self, kind: str, object_id: str, updates: dict[str, Any]) -> None:
+        if kind == "tasks":
+            task = self._find_task(object_id)
+            if not task:
+                raise KeyError(f"Unknown task id: {object_id}")
+            for key, value in updates.items():
+                setattr(task, key, value)
+            self.hub.task_store.save(self.hub.tasks)
+            return
+        self.hub.catalog_manager.update(kind, object_id, updates)
 
-        return self._catalog_help()
+    def _delete_object(self, kind: str, object_id: str) -> None:
+        if kind == "tasks":
+            self.hub.tasks = [task for task in self.hub.tasks if getattr(task, "id", getattr(task, "task_id", None)) != object_id]
+            self.hub.task_store.save(self.hub.tasks)
+            return
+        self.hub.catalog_manager.delete(kind, object_id)
 
-    def _catalog_help(self) -> str:
-        return "\n".join(
-            [
-                "catalog commands:",
-                "/catalog list <kind>",
-                "/catalog create <kind> <json>",
-                "/catalog update <kind> <id> <json>",
-                "/catalog enable <tools|workers> <id>",
-                "/catalog disable <tools|workers> <id>",
-                "/catalog assign worker <worker_id> <type|role|loadout> <value>",
-                "/catalog import <path> [--override]",
-                "/catalog export <path>",
-            ]
-        )
+    def _find_task(self, task_id: str) -> Task | None:
+        for task in self.hub.tasks:
+            current_id = getattr(task, "id", getattr(task, "task_id", None))
+            if current_id == task_id:
+                return task
+        return None
+
+    def _task_row(self, idx: int, task: Task) -> str:
+        task_id = getattr(task, "id", getattr(task, "task_id", "?"))
+        name = getattr(task, "name", getattr(task, "kind", "?"))
+        status = getattr(task, "last_status", getattr(task, "status", "queued")) or "queued"
+        priority = getattr(task, "priority", "?")
+        return f"[{idx}] {name} | {task_id} | {status} | priority={priority}"
 
     def _catalog_identifier(self, kind: str, item: Any) -> str:
-        fields = {
-            "tools": "tool_id",
-            "worker_types": "type_id",
-            "worker_roles": "role_id",
-            "loadouts": "loadout_id",
-            "memory_policies": "policy_id",
-            "workers": "worker_id",
-        }
+        fields = {"tools": "tool_id", "worker_types": "type_id", "worker_roles": "role_id", "loadouts": "loadout_id", "memory_policies": "policy_id", "workers": "worker_id"}
         return str(getattr(item, fields[kind]))
+
+    def _render(self, summary: str, body_lines: list[str], next_actions: list[str]) -> str:
+        lines = [summary]
+        if body_lines:
+            lines.append("")
+            lines.extend(body_lines)
+        lines.append("")
+        lines.append("Next:")
+        lines.extend(f"- {action}" for action in next_actions)
+        return "\n".join(lines)
+
+    def _slugify(self, value: str) -> str:
+        slug = value.strip().lower().replace(" ", "_")
+        return "".join(ch for ch in slug if ch.isalnum() or ch == "_")

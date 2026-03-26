@@ -226,6 +226,64 @@ class CatalogManager:
             raise ValueError(f"Unsupported worker assignment field: {field_name}")
         self.update("workers", worker_id, {field_name: value})
 
+    def dependency_summary(self, kind: str, object_id: str) -> list[str]:
+        snapshot = self.load_effective_catalog()
+        if kind == "tools":
+            loadouts = [item.loadout_id for item in snapshot.loadouts if object_id in item.allowed_tool_ids]
+            return [f"used by loadouts: {', '.join(loadouts)}"] if loadouts else []
+        if kind == "worker_roles":
+            workers = [item.worker_id for item in snapshot.workers if item.role_id == object_id]
+            return [f"used by workers: {', '.join(workers)}"] if workers else []
+        if kind == "worker_types":
+            workers = [item.worker_id for item in snapshot.workers if item.type_id == object_id]
+            return [f"used by workers: {', '.join(workers)}"] if workers else []
+        if kind == "loadouts":
+            workers = [item.worker_id for item in snapshot.workers if item.loadout_id == object_id]
+            return [f"used by workers: {', '.join(workers)}"] if workers else []
+        if kind == "memory_policies":
+            loadouts = [item.loadout_id for item in snapshot.loadouts if item.memory_policy_ref == object_id]
+            return [f"used by loadouts: {', '.join(loadouts)}"] if loadouts else []
+        return []
+
+    def delete(self, kind: str, object_id: str) -> None:
+        if kind not in self.FILES:
+            raise ValueError(f"Unknown catalog kind: {kind}")
+
+        dependencies = self.dependency_summary(kind, object_id)
+        if dependencies and kind not in {"workers"}:
+            raise ValueError(f"Cannot delete {kind} {object_id}: {'; '.join(dependencies)}")
+
+        _, _, key_attr = self.FILES[kind]
+        runtime_items = self.runtime_stores[kind].load()
+        remaining = [item for item in runtime_items if getattr(item, key_attr) != object_id]
+        if len(remaining) != len(runtime_items):
+            candidate = self.build_runtime_snapshot()
+            setattr(candidate, kind, remaining)
+            effective = self._build_snapshot(
+                {name: store.load() for name, store in self.seed_stores.items()},
+                {
+                    "tools": candidate.tools,
+                    "memory_policies": candidate.memory_policies,
+                    "worker_types": candidate.worker_types,
+                    "worker_roles": candidate.worker_roles,
+                    "loadouts": candidate.loadouts,
+                    "workers": candidate.workers,
+                },
+            )
+            self.runtime_stores[kind].save(remaining)
+            self._activate_snapshot(effective)
+            return
+
+        combined = {self._item_key(kind, item): item for item in self.list_objects(kind)}
+        if object_id not in combined:
+            raise KeyError(f"Unknown {kind} id: {object_id}")
+
+        if kind in {"workers", "tools"}:
+            self.set_enabled(kind, object_id, False)
+            return
+
+        raise ValueError(f"Cannot delete seeded {kind} {object_id}; create a runtime replacement or remove dependents first")
+
     def export_package(self, destination: Path) -> Path:
         destination.parent.mkdir(parents=True, exist_ok=True)
         runtime_snapshot = self.build_runtime_snapshot()

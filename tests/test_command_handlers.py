@@ -52,7 +52,8 @@ def test_ping_command() -> None:
 
     result = handlers.handle("/ping", {})
 
-    assert result == "hub alive"
+    assert result.startswith("Hub alive")
+    assert "Next:" in result
 
 
 def test_help_command() -> None:
@@ -61,10 +62,10 @@ def test_help_command() -> None:
 
     result = handlers.handle("/help", {})
 
-    assert "/ping" in result
+    assert "/new" in result
     assert "/status" in result
     assert "/tasks" in result
-    assert "/services" in result
+    assert "/workers" in result
 
 
 def test_unknown_command() -> None:
@@ -73,7 +74,8 @@ def test_unknown_command() -> None:
 
     result = handlers.handle("/wat", {})
 
-    assert result == "unknown command: /wat"
+    assert result.startswith("Unknown command: /wat")
+    assert "Command not recognized." in result
 
 
 def test_status_command_counts_tasks() -> None:
@@ -90,10 +92,7 @@ def test_status_command_counts_tasks() -> None:
 
     result = handlers.handle("/status", {})
 
-    assert "queued: 1" in result
-    assert "running: 1" in result
-    assert "done: 1" in result
-    assert "failed: 1" in result
+    assert "Tasks: 4 total | 1 failed | 0 scheduled" in result
 
 
 def test_tasks_command_shows_recent_tasks() -> None:
@@ -108,9 +107,9 @@ def test_tasks_command_shows_recent_tasks() -> None:
 
     result = handlers.handle("/tasks", {})
 
-    assert "recent tasks:" in result
-    assert "1 | alpha | done" in result
-    assert "2 | beta | failed" in result
+    assert result.startswith("Tasks")
+    assert "[1] alpha | 1 | done" in result
+    assert "[2] beta | 2 | failed" in result
 
 
 def test_tasks_command_empty() -> None:
@@ -119,7 +118,7 @@ def test_tasks_command_empty() -> None:
 
     result = handlers.handle("/tasks", {})
 
-    assert result == "no tasks"
+    assert "No tasks available." in result
 
 
 def test_services_command() -> None:
@@ -128,8 +127,8 @@ def test_services_command() -> None:
 
     result = handlers.handle("/services", {})
 
-    assert "services:" in result
-    assert "telegram | running" in result
+    assert result.startswith("Services")
+    assert "telegram | running | service" in result
 
 
 def test_runtime_command() -> None:
@@ -138,8 +137,8 @@ def test_runtime_command() -> None:
 
     result = handlers.handle("/runtime", {})
 
-    assert "runtime status" in result
-    assert "worker types:" in result
+    assert result.startswith("Runtime status")
+    assert "worker types: 3" in result
 
 
 def test_catalog_list_and_create_commands() -> None:
@@ -147,13 +146,13 @@ def test_catalog_list_and_create_commands() -> None:
     handlers = CommandHandlers(hub)
 
     list_result = handlers.handle("/catalog list workers", {})
-    assert "workers:" in list_result
+    assert list_result.startswith("Catalog list")
 
     create_result = handlers.handle(
         '/catalog create workers {"worker_id":"cmd_worker","name":"Cmd Worker","type_id":"agent_worker","role_id":"operator","loadout_id":"operator_core"}',
         {},
     )
-    assert create_result == "created workers cmd_worker"
+    assert create_result.startswith("Catalog object created")
 
     listed = handlers.handle("/catalog list workers", {})
     assert "cmd_worker" in listed
@@ -163,5 +162,6 @@ def test_catalog_update_command_rejects_invalid_change() -> None:
     hub = DummyHub()
     handlers = CommandHandlers(hub)
 
-    with pytest.raises(ValueError):
-        handlers.handle('/catalog update workers aria {"loadout_id":"missing_loadout"}', {})
+    result = handlers.handle('/catalog update workers aria {"loadout_id":"missing_loadout"}', {})
+    assert result.startswith("Catalog command failed")
+    assert "Unknown loadout" in result

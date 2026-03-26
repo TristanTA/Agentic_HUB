@@ -120,3 +120,869 @@
 2026-03-25 17:01:47,543 | INFO | Registered service: telegram
 2026-03-25 17:01:47,565 | WARNING | Ignoring invalid TELEGRAM_ALLOWED_USER_IDS entry: abc
 2026-03-25 17:01:47,565 | INFO | Registered service: telegram
+2026-03-25 21:00:53,752 | INFO | Registered service: telegram
+2026-03-25 21:00:53,757 | INFO | Registered service: telegram
+2026-03-25 21:00:53,758 | INFO | Task Interval Task -> success
+2026-03-25 21:00:53,761 | INFO | Registered service: telegram
+2026-03-25 21:00:53,761 | INFO | Task Retry Reset Task -> success
+2026-03-25 21:00:53,767 | INFO | Registered service: telegram
+2026-03-25 21:00:53,768 | WARNING | Task Backoff Task failed (1/3). Retrying in 10s
+2026-03-25 21:00:53,773 | INFO | Registered service: telegram
+2026-03-25 21:00:53,774 | WARNING | Task Second Backoff Task failed (2/3). Retrying in 20s
+2026-03-25 21:00:53,777 | INFO | Registered service: telegram
+2026-03-25 21:00:53,779 | ERROR | Task Dead Bin Task exceeded max retries and was moved to dead_tasks.json
+2026-03-25 21:00:53,796 | INFO | Registered service: telegram
+2026-03-25 21:00:53,799 | INFO | Task One Time Task -> success
+2026-03-25 21:00:53,802 | INFO | Registered service: telegram
+2026-03-25 21:00:53,803 | INFO | Task Startup Task -> success
+2026-03-25 21:00:53,808 | INFO | Registered service: telegram
+2026-03-25 21:00:53,809 | INFO | Hub stopped
+2026-03-25 21:00:53,814 | INFO | Registered service: telegram
+2026-03-25 21:00:53,815 | INFO | Hub running
+2026-03-25 21:00:53,815 | INFO | Heartbeat
+2026-03-25 21:00:53,816 | INFO | Task Interval Task -> success
+2026-03-25 21:00:53,817 | INFO | Hub stopped
+2026-03-25 21:00:53,821 | INFO | Registered service: telegram
+2026-03-25 21:00:53,822 | INFO | Hub running
+2026-03-25 21:00:53,823 | INFO | Heartbeat
+2026-03-25 21:00:53,823 | WARNING | Task Failing Interval Task failed (1/3). Retrying in 10s
+2026-03-25 21:00:53,823 | INFO | Hub stopped
+2026-03-25 21:00:53,828 | INFO | Registered service: telegram
+2026-03-25 21:00:53,832 | INFO | Registered service: telegram
+2026-03-25 21:00:53,844 | INFO | Registered service: telegram
+2026-03-25 21:00:53,863 | WARNING | Ignoring invalid TELEGRAM_ALLOWED_USER_IDS entry: abc
+2026-03-25 21:00:53,863 | INFO | Registered service: telegram
+2026-03-25 21:01:05,706 | INFO | Registered service: telegram
+2026-03-25 21:01:05,706 | INFO | Hub running
+2026-03-25 21:01:05,706 | INFO | Heartbeat
+2026-03-25 21:01:05,706 | INFO | Task Startup Task -> success
+2026-03-25 21:01:10,709 | INFO | Heartbeat
+2026-03-25 21:01:10,715 | INFO | Task Start Telegram Service -> success
+2026-03-25 21:01:15,716 | INFO | Heartbeat
+2026-03-25 21:01:15,717 | INFO | Task Interval Task -> success
+2026-03-25 21:01:20,719 | INFO | Heartbeat
+2026-03-25 21:01:25,720 | INFO | Heartbeat
+2026-03-25 21:01:30,721 | INFO | Heartbeat
+2026-03-25 21:01:35,723 | INFO | Heartbeat
+2026-03-25 21:01:40,725 | INFO | Heartbeat
+2026-03-25 21:01:45,726 | INFO | Heartbeat
+2026-03-25 21:01:45,726 | INFO | Task Interval Task -> success
+2026-03-25 21:01:50,731 | INFO | Heartbeat
+2026-03-25 21:01:55,732 | INFO | Heartbeat
+2026-03-25 21:02:00,734 | INFO | Heartbeat
+2026-03-25 21:02:05,735 | INFO | Heartbeat
+2026-03-25 21:02:10,736 | INFO | Heartbeat
+2026-03-25 21:02:15,738 | INFO | Heartbeat
+2026-03-25 21:02:15,738 | INFO | Task Interval Task -> success
+2026-03-25 21:02:20,743 | INFO | Heartbeat
+2026-03-25 21:02:25,744 | INFO | Heartbeat
+2026-03-25 21:02:30,746 | INFO | Heartbeat
+2026-03-25 21:02:35,747 | INFO | Heartbeat
+2026-03-25 21:02:40,748 | INFO | Heartbeat
+2026-03-25 21:02:45,749 | INFO | Heartbeat
+2026-03-25 21:02:45,749 | INFO | Task Interval Task -> success
+2026-03-25 21:02:50,753 | INFO | Heartbeat
+2026-03-25 21:02:55,754 | INFO | Heartbeat
+2026-03-25 21:03:00,756 | INFO | Heartbeat
+2026-03-25 21:03:05,758 | INFO | Heartbeat
+2026-03-25 21:03:10,760 | INFO | Heartbeat
+2026-03-25 21:03:15,761 | INFO | Heartbeat
+2026-03-25 21:03:15,761 | INFO | Task Interval Task -> success
+2026-03-25 21:03:20,766 | INFO | Heartbeat
+2026-03-25 21:03:25,767 | INFO | Heartbeat
+2026-03-25 21:03:30,769 | INFO | Heartbeat
+2026-03-25 21:03:35,770 | INFO | Heartbeat
+2026-03-25 21:03:40,771 | INFO | Heartbeat
+2026-03-25 21:03:45,772 | INFO | Heartbeat
+2026-03-25 21:03:45,774 | INFO | Task Interval Task -> success
+2026-03-25 21:03:50,774 | INFO | Heartbeat
+2026-03-25 21:03:55,776 | INFO | Heartbeat
+2026-03-25 21:04:00,777 | INFO | Heartbeat
+2026-03-25 21:04:05,778 | INFO | Heartbeat
+2026-03-25 21:04:10,779 | INFO | Heartbeat
+2026-03-25 21:04:15,780 | INFO | Heartbeat
+2026-03-25 21:04:15,782 | INFO | Task Interval Task -> success
+2026-03-25 21:04:20,784 | INFO | Heartbeat
+2026-03-25 21:04:25,785 | INFO | Heartbeat
+2026-03-25 21:04:30,785 | INFO | Heartbeat
+2026-03-25 21:04:35,786 | INFO | Heartbeat
+2026-03-25 21:04:40,787 | INFO | Heartbeat
+2026-03-25 21:04:45,789 | INFO | Heartbeat
+2026-03-25 21:04:45,789 | INFO | Task Interval Task -> success
+2026-03-25 21:04:50,792 | INFO | Heartbeat
+2026-03-25 21:04:55,792 | INFO | Heartbeat
+2026-03-25 21:05:00,793 | INFO | Heartbeat
+2026-03-25 21:05:05,794 | INFO | Heartbeat
+2026-03-25 21:05:10,795 | INFO | Heartbeat
+2026-03-25 21:05:15,796 | INFO | Heartbeat
+2026-03-25 21:05:15,798 | INFO | Task Interval Task -> success
+2026-03-25 21:05:20,799 | INFO | Heartbeat
+2026-03-25 21:05:25,800 | INFO | Heartbeat
+2026-03-25 21:05:30,801 | INFO | Heartbeat
+2026-03-25 21:05:35,803 | INFO | Heartbeat
+2026-03-25 21:05:40,804 | INFO | Heartbeat
+2026-03-25 21:05:45,805 | INFO | Heartbeat
+2026-03-25 21:05:45,808 | INFO | Task Interval Task -> success
+2026-03-25 21:05:50,810 | INFO | Heartbeat
+2026-03-25 21:05:55,811 | INFO | Heartbeat
+2026-03-25 21:06:00,812 | INFO | Heartbeat
+2026-03-25 21:06:05,813 | INFO | Heartbeat
+2026-03-25 21:06:10,814 | INFO | Heartbeat
+2026-03-25 21:06:15,815 | INFO | Heartbeat
+2026-03-25 21:06:15,817 | INFO | Task Interval Task -> success
+2026-03-25 21:06:20,818 | INFO | Heartbeat
+2026-03-25 21:06:25,819 | INFO | Heartbeat
+2026-03-25 21:06:30,821 | INFO | Heartbeat
+2026-03-25 21:06:35,822 | INFO | Heartbeat
+2026-03-25 21:06:40,823 | INFO | Heartbeat
+2026-03-25 21:06:45,824 | INFO | Heartbeat
+2026-03-25 21:06:45,826 | INFO | Task Interval Task -> success
+2026-03-25 21:06:50,827 | INFO | Heartbeat
+2026-03-25 21:06:55,828 | INFO | Heartbeat
+2026-03-25 21:07:00,829 | INFO | Heartbeat
+2026-03-25 21:07:05,831 | INFO | Heartbeat
+2026-03-25 21:07:10,831 | INFO | Heartbeat
+2026-03-25 21:07:15,832 | INFO | Heartbeat
+2026-03-25 21:07:15,835 | INFO | Task Interval Task -> success
+2026-03-25 21:07:20,837 | INFO | Heartbeat
+2026-03-25 21:07:25,837 | INFO | Heartbeat
+2026-03-25 21:07:30,839 | INFO | Heartbeat
+2026-03-25 21:07:35,840 | INFO | Heartbeat
+2026-03-25 21:07:40,841 | INFO | Heartbeat
+2026-03-25 21:07:45,842 | INFO | Heartbeat
+2026-03-25 21:07:45,845 | INFO | Task Interval Task -> success
+2026-03-25 21:07:50,846 | INFO | Heartbeat
+2026-03-25 21:07:55,847 | INFO | Heartbeat
+2026-03-25 21:08:00,848 | INFO | Heartbeat
+2026-03-25 21:08:05,850 | INFO | Heartbeat
+2026-03-25 21:08:10,851 | INFO | Heartbeat
+2026-03-25 21:08:15,852 | INFO | Heartbeat
+2026-03-25 21:08:15,855 | INFO | Task Interval Task -> success
+2026-03-25 21:08:20,856 | INFO | Heartbeat
+2026-03-25 21:08:25,858 | INFO | Heartbeat
+2026-03-25 21:08:30,859 | INFO | Heartbeat
+2026-03-25 21:08:35,861 | INFO | Heartbeat
+2026-03-25 21:08:40,862 | INFO | Heartbeat
+2026-03-25 21:08:45,863 | INFO | Heartbeat
+2026-03-25 21:08:45,865 | INFO | Task Interval Task -> success
+2026-03-25 21:08:50,867 | INFO | Heartbeat
+2026-03-25 21:08:55,867 | INFO | Heartbeat
+2026-03-25 21:09:00,868 | INFO | Heartbeat
+2026-03-25 21:09:05,869 | INFO | Heartbeat
+2026-03-25 21:09:10,870 | INFO | Heartbeat
+2026-03-25 21:09:15,871 | INFO | Heartbeat
+2026-03-25 21:09:15,871 | INFO | Task Interval Task -> success
+2026-03-25 21:09:20,873 | INFO | Heartbeat
+2026-03-25 21:09:25,874 | INFO | Heartbeat
+2026-03-25 21:09:30,875 | INFO | Heartbeat
+2026-03-25 21:09:35,876 | INFO | Heartbeat
+2026-03-25 21:09:40,876 | INFO | Heartbeat
+2026-03-25 21:09:45,877 | INFO | Heartbeat
+2026-03-25 21:09:45,877 | INFO | Task Interval Task -> success
+2026-03-25 21:09:50,880 | INFO | Heartbeat
+2026-03-25 21:09:55,882 | INFO | Heartbeat
+2026-03-25 21:10:00,883 | INFO | Heartbeat
+2026-03-25 21:10:05,884 | INFO | Heartbeat
+2026-03-25 21:10:10,885 | INFO | Heartbeat
+2026-03-25 21:10:15,885 | INFO | Heartbeat
+2026-03-25 21:10:15,888 | INFO | Task Interval Task -> success
+2026-03-25 21:10:20,889 | INFO | Heartbeat
+2026-03-25 21:10:25,890 | INFO | Heartbeat
+2026-03-25 21:10:30,891 | INFO | Heartbeat
+2026-03-25 21:10:35,892 | INFO | Heartbeat
+2026-03-25 21:10:40,893 | INFO | Heartbeat
+2026-03-25 21:10:45,894 | INFO | Heartbeat
+2026-03-25 21:10:45,898 | INFO | Task Interval Task -> success
+2026-03-25 21:10:50,899 | INFO | Heartbeat
+2026-03-25 21:10:55,900 | INFO | Heartbeat
+2026-03-25 21:11:00,902 | INFO | Heartbeat
+2026-03-25 21:11:05,903 | INFO | Heartbeat
+2026-03-25 21:11:10,904 | INFO | Heartbeat
+2026-03-25 21:11:15,905 | INFO | Heartbeat
+2026-03-25 21:11:15,907 | INFO | Task Interval Task -> success
+2026-03-25 21:11:20,909 | INFO | Heartbeat
+2026-03-25 21:11:25,910 | INFO | Heartbeat
+2026-03-25 21:11:30,911 | INFO | Heartbeat
+2026-03-25 21:11:35,912 | INFO | Heartbeat
+2026-03-25 21:11:40,914 | INFO | Heartbeat
+2026-03-25 21:11:45,915 | INFO | Heartbeat
+2026-03-25 21:11:45,916 | INFO | Task Interval Task -> success
+2026-03-25 21:11:50,917 | INFO | Heartbeat
+2026-03-25 21:11:55,918 | INFO | Heartbeat
+2026-03-25 21:12:00,920 | INFO | Heartbeat
+2026-03-25 21:12:05,921 | INFO | Heartbeat
+2026-03-25 21:12:10,922 | INFO | Heartbeat
+2026-03-25 21:12:15,924 | INFO | Heartbeat
+2026-03-25 21:12:15,927 | INFO | Task Interval Task -> success
+2026-03-25 21:12:20,928 | INFO | Heartbeat
+2026-03-25 21:12:25,929 | INFO | Heartbeat
+2026-03-25 21:12:30,930 | INFO | Heartbeat
+2026-03-25 21:12:35,931 | INFO | Heartbeat
+2026-03-25 21:12:40,932 | INFO | Heartbeat
+2026-03-25 21:12:45,933 | INFO | Heartbeat
+2026-03-25 21:12:45,935 | INFO | Task Interval Task -> success
+2026-03-25 21:12:50,936 | INFO | Heartbeat
+2026-03-25 21:12:55,937 | INFO | Heartbeat
+2026-03-25 21:13:00,939 | INFO | Heartbeat
+2026-03-25 21:13:05,941 | INFO | Heartbeat
+2026-03-25 21:13:10,942 | INFO | Heartbeat
+2026-03-25 21:13:15,945 | INFO | Heartbeat
+2026-03-25 21:13:15,949 | INFO | Task Interval Task -> success
+2026-03-25 21:13:20,951 | INFO | Heartbeat
+2026-03-25 21:13:25,952 | INFO | Heartbeat
+2026-03-25 21:13:30,954 | INFO | Heartbeat
+2026-03-25 21:13:35,955 | INFO | Heartbeat
+2026-03-25 21:13:40,956 | INFO | Heartbeat
+2026-03-25 21:13:45,957 | INFO | Heartbeat
+2026-03-25 21:13:45,959 | INFO | Task Interval Task -> success
+2026-03-25 21:13:50,961 | INFO | Heartbeat
+2026-03-25 21:15:29,211 | INFO | Registered service: telegram
+2026-03-25 21:15:29,226 | INFO | Hub running
+2026-03-25 21:15:29,226 | INFO | Heartbeat
+2026-03-25 21:15:29,227 | INFO | Task Startup Task -> success
+2026-03-25 21:15:34,229 | INFO | Heartbeat
+2026-03-25 21:15:34,231 | INFO | Task Start Telegram Service -> success
+2026-03-25 21:15:39,236 | INFO | Heartbeat
+2026-03-25 21:15:39,238 | INFO | Task Interval Task -> success
+2026-03-25 21:15:44,239 | INFO | Heartbeat
+2026-03-25 21:15:49,241 | INFO | Heartbeat
+2026-03-25 21:15:54,242 | INFO | Heartbeat
+2026-03-25 21:15:59,243 | INFO | Heartbeat
+2026-03-25 21:16:04,243 | INFO | Heartbeat
+2026-03-25 21:16:09,245 | INFO | Heartbeat
+2026-03-25 21:16:09,248 | INFO | Task Interval Task -> success
+2026-03-25 21:16:14,249 | INFO | Heartbeat
+2026-03-25 21:16:19,251 | INFO | Heartbeat
+2026-03-25 21:16:24,252 | INFO | Heartbeat
+2026-03-25 21:16:29,253 | INFO | Heartbeat
+2026-03-25 21:16:34,254 | INFO | Heartbeat
+2026-03-25 21:16:39,255 | INFO | Heartbeat
+2026-03-25 21:16:39,255 | INFO | Task Interval Task -> success
+2026-03-25 21:16:44,258 | INFO | Heartbeat
+2026-03-25 21:16:49,259 | INFO | Heartbeat
+2026-03-25 21:16:54,260 | INFO | Heartbeat
+2026-03-25 21:16:59,261 | INFO | Heartbeat
+2026-03-25 21:17:04,263 | INFO | Heartbeat
+2026-03-25 21:17:09,264 | INFO | Heartbeat
+2026-03-25 21:17:09,266 | INFO | Task Interval Task -> success
+2026-03-25 21:17:14,268 | INFO | Heartbeat
+2026-03-25 21:17:19,269 | INFO | Heartbeat
+2026-03-25 21:17:24,270 | INFO | Heartbeat
+2026-03-25 21:17:29,271 | INFO | Heartbeat
+2026-03-25 21:17:34,273 | INFO | Heartbeat
+2026-03-25 21:17:39,274 | INFO | Heartbeat
+2026-03-25 21:17:39,276 | INFO | Task Interval Task -> success
+2026-03-25 21:17:44,278 | INFO | Heartbeat
+2026-03-25 21:17:49,279 | INFO | Heartbeat
+2026-03-25 21:17:54,280 | INFO | Heartbeat
+2026-03-25 21:17:59,281 | INFO | Heartbeat
+2026-03-25 21:18:04,282 | INFO | Heartbeat
+2026-03-25 21:18:09,284 | INFO | Heartbeat
+2026-03-25 21:18:09,285 | INFO | Task Interval Task -> success
+2026-03-25 21:18:14,287 | INFO | Heartbeat
+2026-03-25 21:18:19,288 | INFO | Heartbeat
+2026-03-25 21:18:24,289 | INFO | Heartbeat
+2026-03-25 21:18:29,290 | INFO | Heartbeat
+2026-03-25 21:18:34,291 | INFO | Heartbeat
+2026-03-25 21:18:39,292 | INFO | Heartbeat
+2026-03-25 21:18:39,292 | INFO | Task Interval Task -> success
+2026-03-25 21:18:44,296 | INFO | Heartbeat
+2026-03-25 21:18:49,297 | INFO | Heartbeat
+2026-03-25 21:18:54,298 | INFO | Heartbeat
+2026-03-25 21:18:59,300 | INFO | Heartbeat
+2026-03-25 21:19:04,301 | INFO | Heartbeat
+2026-03-25 21:19:09,302 | INFO | Heartbeat
+2026-03-25 21:19:09,304 | INFO | Task Interval Task -> success
+2026-03-25 21:19:14,305 | INFO | Heartbeat
+2026-03-25 21:19:19,306 | INFO | Heartbeat
+2026-03-25 21:19:24,307 | INFO | Heartbeat
+2026-03-25 21:19:29,308 | INFO | Heartbeat
+2026-03-25 21:19:34,309 | INFO | Heartbeat
+2026-03-25 21:19:39,310 | INFO | Heartbeat
+2026-03-25 21:19:39,312 | INFO | Task Interval Task -> success
+2026-03-25 21:19:44,313 | INFO | Heartbeat
+2026-03-25 21:19:49,315 | INFO | Heartbeat
+2026-03-25 21:19:54,316 | INFO | Heartbeat
+2026-03-25 21:19:59,317 | INFO | Heartbeat
+2026-03-25 21:20:04,318 | INFO | Heartbeat
+2026-03-25 21:20:09,320 | INFO | Heartbeat
+2026-03-25 21:20:09,322 | INFO | Task Interval Task -> success
+2026-03-25 21:20:14,323 | INFO | Heartbeat
+2026-03-25 21:20:19,325 | INFO | Heartbeat
+2026-03-25 21:20:24,326 | INFO | Heartbeat
+2026-03-25 21:20:29,327 | INFO | Heartbeat
+2026-03-25 21:20:34,328 | INFO | Heartbeat
+2026-03-25 21:20:39,329 | INFO | Heartbeat
+2026-03-25 21:20:39,329 | INFO | Task Interval Task -> success
+2026-03-25 21:20:44,334 | INFO | Heartbeat
+2026-03-25 21:20:49,336 | INFO | Heartbeat
+2026-03-25 21:20:54,337 | INFO | Heartbeat
+2026-03-25 21:20:59,337 | INFO | Heartbeat
+2026-03-25 21:21:04,338 | INFO | Heartbeat
+2026-03-25 21:21:09,339 | INFO | Heartbeat
+2026-03-25 21:21:09,340 | INFO | Task Interval Task -> success
+2026-03-25 21:21:14,341 | INFO | Heartbeat
+2026-03-25 21:21:19,342 | INFO | Heartbeat
+2026-03-25 21:21:24,344 | INFO | Heartbeat
+2026-03-25 21:21:29,345 | INFO | Heartbeat
+2026-03-25 21:21:34,346 | INFO | Heartbeat
+2026-03-25 21:21:39,347 | INFO | Heartbeat
+2026-03-25 21:21:39,349 | INFO | Task Interval Task -> success
+2026-03-25 21:21:44,351 | INFO | Heartbeat
+2026-03-25 21:21:49,352 | INFO | Heartbeat
+2026-03-25 21:21:54,354 | INFO | Heartbeat
+2026-03-25 21:21:59,355 | INFO | Heartbeat
+2026-03-25 21:22:04,356 | INFO | Heartbeat
+2026-03-25 21:22:09,357 | INFO | Heartbeat
+2026-03-25 21:22:09,359 | INFO | Task Interval Task -> success
+2026-03-25 21:22:14,360 | INFO | Heartbeat
+2026-03-25 21:22:19,361 | INFO | Heartbeat
+2026-03-25 21:22:24,363 | INFO | Heartbeat
+2026-03-25 21:22:29,365 | INFO | Heartbeat
+2026-03-25 21:22:34,366 | INFO | Heartbeat
+2026-03-25 21:22:39,367 | INFO | Heartbeat
+2026-03-25 21:22:39,368 | INFO | Task Interval Task -> success
+2026-03-25 21:22:44,369 | INFO | Heartbeat
+2026-03-25 21:22:49,371 | INFO | Heartbeat
+2026-03-25 21:22:54,372 | INFO | Heartbeat
+2026-03-25 21:22:59,373 | INFO | Heartbeat
+2026-03-25 21:23:04,374 | INFO | Heartbeat
+2026-03-25 21:23:09,375 | INFO | Heartbeat
+2026-03-25 21:23:09,377 | INFO | Task Interval Task -> success
+2026-03-25 21:23:14,378 | INFO | Heartbeat
+2026-03-25 21:23:19,379 | INFO | Heartbeat
+2026-03-25 21:23:24,380 | INFO | Heartbeat
+2026-03-25 21:23:29,382 | INFO | Heartbeat
+2026-03-25 21:23:34,384 | INFO | Heartbeat
+2026-03-25 21:23:39,385 | INFO | Heartbeat
+2026-03-25 21:23:39,388 | INFO | Task Interval Task -> success
+2026-03-25 21:23:44,389 | INFO | Heartbeat
+2026-03-25 21:23:49,390 | INFO | Heartbeat
+2026-03-25 21:23:54,391 | INFO | Heartbeat
+2026-03-25 21:23:59,393 | INFO | Heartbeat
+2026-03-25 21:24:04,394 | INFO | Heartbeat
+2026-03-25 21:24:09,395 | INFO | Heartbeat
+2026-03-25 21:24:09,398 | INFO | Task Interval Task -> success
+2026-03-25 21:24:14,399 | INFO | Heartbeat
+2026-03-25 21:24:19,400 | INFO | Heartbeat
+2026-03-25 21:24:24,401 | INFO | Heartbeat
+2026-03-25 21:24:29,403 | INFO | Heartbeat
+2026-03-25 21:24:34,404 | INFO | Heartbeat
+2026-03-25 21:24:39,405 | INFO | Heartbeat
+2026-03-25 21:24:39,408 | INFO | Task Interval Task -> success
+2026-03-25 21:24:44,411 | INFO | Heartbeat
+2026-03-25 21:24:49,412 | INFO | Heartbeat
+2026-03-25 21:24:54,414 | INFO | Heartbeat
+2026-03-25 21:24:59,416 | INFO | Heartbeat
+2026-03-25 21:25:04,417 | INFO | Heartbeat
+2026-03-25 21:25:09,419 | INFO | Heartbeat
+2026-03-25 21:25:09,419 | INFO | Task Interval Task -> success
+2026-03-25 21:25:14,424 | INFO | Heartbeat
+2026-03-25 21:25:19,426 | INFO | Heartbeat
+2026-03-25 21:25:24,428 | INFO | Heartbeat
+2026-03-25 21:25:29,430 | INFO | Heartbeat
+2026-03-25 21:25:34,432 | INFO | Heartbeat
+2026-03-25 21:25:39,433 | INFO | Heartbeat
+2026-03-25 21:25:39,433 | INFO | Task Interval Task -> success
+2026-03-25 21:25:44,436 | INFO | Heartbeat
+2026-03-25 21:25:49,437 | INFO | Heartbeat
+2026-03-25 21:25:54,439 | INFO | Heartbeat
+2026-03-25 21:25:59,440 | INFO | Heartbeat
+2026-03-25 21:26:04,442 | INFO | Heartbeat
+2026-03-25 21:26:09,443 | INFO | Heartbeat
+2026-03-25 21:26:09,443 | INFO | Task Interval Task -> success
+2026-03-25 21:26:14,448 | INFO | Heartbeat
+2026-03-25 21:26:19,450 | INFO | Heartbeat
+2026-03-25 21:26:24,451 | INFO | Heartbeat
+2026-03-25 21:26:29,453 | INFO | Heartbeat
+2026-03-25 21:26:34,455 | INFO | Heartbeat
+2026-03-25 21:26:39,457 | INFO | Heartbeat
+2026-03-25 21:26:39,457 | INFO | Task Interval Task -> success
+2026-03-25 21:26:44,461 | INFO | Heartbeat
+2026-03-25 21:26:49,463 | INFO | Heartbeat
+2026-03-25 21:26:54,465 | INFO | Heartbeat
+2026-03-25 21:26:59,466 | INFO | Heartbeat
+2026-03-25 21:27:04,468 | INFO | Heartbeat
+2026-03-25 21:27:09,469 | INFO | Heartbeat
+2026-03-25 21:27:09,472 | INFO | Task Interval Task -> success
+2026-03-25 21:27:14,474 | INFO | Heartbeat
+2026-03-25 21:27:19,475 | INFO | Heartbeat
+2026-03-25 21:27:24,476 | INFO | Heartbeat
+2026-03-25 21:27:29,478 | INFO | Heartbeat
+2026-03-25 21:27:34,479 | INFO | Heartbeat
+2026-03-25 21:27:39,482 | INFO | Heartbeat
+2026-03-25 21:27:39,482 | INFO | Task Interval Task -> success
+2026-03-25 21:27:44,486 | INFO | Heartbeat
+2026-03-25 21:27:49,488 | INFO | Heartbeat
+2026-03-25 21:27:54,489 | INFO | Heartbeat
+2026-03-25 21:27:59,491 | INFO | Heartbeat
+2026-03-25 21:28:04,492 | INFO | Heartbeat
+2026-03-25 21:28:09,493 | INFO | Heartbeat
+2026-03-25 21:28:09,497 | INFO | Task Interval Task -> success
+2026-03-25 21:28:14,499 | INFO | Heartbeat
+2026-03-25 21:28:19,500 | INFO | Heartbeat
+2026-03-25 21:28:24,502 | INFO | Heartbeat
+2026-03-25 21:28:29,504 | INFO | Heartbeat
+2026-03-25 21:28:34,506 | INFO | Heartbeat
+2026-03-25 21:28:39,507 | INFO | Heartbeat
+2026-03-25 21:28:39,507 | INFO | Task Interval Task -> success
+2026-03-25 21:28:44,511 | INFO | Heartbeat
+2026-03-25 21:28:49,513 | INFO | Heartbeat
+2026-03-25 21:28:54,514 | INFO | Heartbeat
+2026-03-25 21:28:59,516 | INFO | Heartbeat
+2026-03-25 21:29:04,517 | INFO | Heartbeat
+2026-03-25 21:29:09,519 | INFO | Heartbeat
+2026-03-25 21:29:09,521 | INFO | Task Interval Task -> success
+2026-03-25 21:29:14,524 | INFO | Heartbeat
+2026-03-25 21:29:19,525 | INFO | Heartbeat
+2026-03-25 21:29:24,526 | INFO | Heartbeat
+2026-03-25 21:29:29,528 | INFO | Heartbeat
+2026-03-25 21:29:34,530 | INFO | Heartbeat
+2026-03-25 21:29:39,533 | INFO | Heartbeat
+2026-03-25 21:29:39,537 | INFO | Task Interval Task -> success
+2026-03-25 21:29:44,539 | INFO | Heartbeat
+2026-03-25 21:29:49,541 | INFO | Heartbeat
+2026-03-25 21:29:54,542 | INFO | Heartbeat
+2026-03-25 21:29:59,542 | INFO | Heartbeat
+2026-03-25 21:30:04,544 | INFO | Heartbeat
+2026-03-25 21:30:09,548 | INFO | Heartbeat
+2026-03-25 21:30:09,550 | INFO | Task Interval Task -> success
+2026-03-25 21:30:14,551 | INFO | Heartbeat
+2026-03-25 21:30:19,552 | INFO | Heartbeat
+2026-03-25 21:30:24,553 | INFO | Heartbeat
+2026-03-25 21:30:29,554 | INFO | Heartbeat
+2026-03-25 21:30:34,556 | INFO | Heartbeat
+2026-03-25 21:30:39,557 | INFO | Heartbeat
+2026-03-25 21:30:39,557 | INFO | Task Interval Task -> success
+2026-03-25 21:30:44,558 | INFO | Heartbeat
+2026-03-25 21:30:49,560 | INFO | Heartbeat
+2026-03-25 21:30:54,561 | INFO | Heartbeat
+2026-03-25 21:30:59,562 | INFO | Heartbeat
+2026-03-25 21:31:04,563 | INFO | Heartbeat
+2026-03-25 21:31:09,565 | INFO | Heartbeat
+2026-03-25 21:31:09,566 | INFO | Task Interval Task -> success
+2026-03-25 21:31:14,568 | INFO | Heartbeat
+2026-03-25 21:31:19,569 | INFO | Heartbeat
+2026-03-25 21:31:24,570 | INFO | Heartbeat
+2026-03-25 21:31:29,572 | INFO | Heartbeat
+2026-03-25 21:31:34,573 | INFO | Heartbeat
+2026-03-25 21:31:39,574 | INFO | Heartbeat
+2026-03-25 21:31:39,577 | INFO | Task Interval Task -> success
+2026-03-25 21:31:44,577 | INFO | Heartbeat
+2026-03-25 21:31:49,578 | INFO | Heartbeat
+2026-03-25 21:31:54,579 | INFO | Heartbeat
+2026-03-25 21:31:59,580 | INFO | Heartbeat
+2026-03-25 21:32:04,581 | INFO | Heartbeat
+2026-03-25 21:32:09,582 | INFO | Heartbeat
+2026-03-25 21:32:09,583 | INFO | Task Interval Task -> success
+2026-03-25 21:32:14,584 | INFO | Heartbeat
+2026-03-25 21:32:19,585 | INFO | Heartbeat
+2026-03-25 21:32:24,586 | INFO | Heartbeat
+2026-03-25 21:32:29,587 | INFO | Heartbeat
+2026-03-25 21:32:34,588 | INFO | Heartbeat
+2026-03-25 21:32:39,589 | INFO | Heartbeat
+2026-03-25 21:32:39,591 | INFO | Task Interval Task -> success
+2026-03-25 21:32:44,592 | INFO | Heartbeat
+2026-03-25 21:32:49,593 | INFO | Heartbeat
+2026-03-25 21:32:54,594 | INFO | Heartbeat
+2026-03-25 21:32:59,595 | INFO | Heartbeat
+2026-03-25 21:33:04,596 | INFO | Heartbeat
+2026-03-25 21:33:09,597 | INFO | Heartbeat
+2026-03-25 21:33:09,598 | INFO | Task Interval Task -> success
+2026-03-25 21:33:14,599 | INFO | Heartbeat
+2026-03-25 21:33:19,600 | INFO | Heartbeat
+2026-03-25 21:33:24,601 | INFO | Heartbeat
+2026-03-25 21:33:29,602 | INFO | Heartbeat
+2026-03-25 21:33:34,603 | INFO | Heartbeat
+2026-03-25 21:33:39,604 | INFO | Heartbeat
+2026-03-25 21:33:39,607 | INFO | Task Interval Task -> success
+2026-03-25 21:33:44,608 | INFO | Heartbeat
+2026-03-25 21:33:49,609 | INFO | Heartbeat
+2026-03-25 21:33:54,610 | INFO | Heartbeat
+2026-03-25 21:33:59,611 | INFO | Heartbeat
+2026-03-25 21:34:04,611 | INFO | Heartbeat
+2026-03-25 21:34:09,612 | INFO | Heartbeat
+2026-03-25 21:34:09,616 | INFO | Task Interval Task -> success
+2026-03-25 21:34:14,616 | INFO | Heartbeat
+2026-03-25 21:34:19,617 | INFO | Heartbeat
+2026-03-25 21:34:24,618 | INFO | Heartbeat
+2026-03-25 21:34:29,619 | INFO | Heartbeat
+2026-03-25 21:34:34,620 | INFO | Heartbeat
+2026-03-25 21:34:39,621 | INFO | Heartbeat
+2026-03-25 21:34:39,624 | INFO | Task Interval Task -> success
+2026-03-25 21:34:44,625 | INFO | Heartbeat
+2026-03-25 21:34:49,626 | INFO | Heartbeat
+2026-03-25 21:34:54,627 | INFO | Heartbeat
+2026-03-25 21:34:59,628 | INFO | Heartbeat
+2026-03-25 21:35:04,629 | INFO | Heartbeat
+2026-03-25 21:35:09,631 | INFO | Heartbeat
+2026-03-25 21:35:09,633 | INFO | Task Interval Task -> success
+2026-03-25 21:35:14,633 | INFO | Heartbeat
+2026-03-25 21:35:19,634 | INFO | Heartbeat
+2026-03-25 21:35:24,636 | INFO | Heartbeat
+2026-03-25 21:35:29,637 | INFO | Heartbeat
+2026-03-25 21:35:34,638 | INFO | Heartbeat
+2026-03-25 21:35:39,640 | INFO | Heartbeat
+2026-03-25 21:35:39,643 | INFO | Task Interval Task -> success
+2026-03-25 21:35:44,644 | INFO | Heartbeat
+2026-03-25 21:35:49,645 | INFO | Heartbeat
+2026-03-25 21:35:54,647 | INFO | Heartbeat
+2026-03-25 21:35:59,648 | INFO | Heartbeat
+2026-03-25 21:36:04,648 | INFO | Heartbeat
+2026-03-25 21:36:09,649 | INFO | Heartbeat
+2026-03-25 21:36:09,650 | INFO | Task Interval Task -> success
+2026-03-25 21:36:14,651 | INFO | Heartbeat
+2026-03-25 21:36:19,652 | INFO | Heartbeat
+2026-03-25 21:36:24,653 | INFO | Heartbeat
+2026-03-25 21:36:29,654 | INFO | Heartbeat
+2026-03-25 21:36:34,656 | INFO | Heartbeat
+2026-03-25 21:36:39,657 | INFO | Heartbeat
+2026-03-25 21:36:39,659 | INFO | Task Interval Task -> success
+2026-03-25 21:36:44,660 | INFO | Heartbeat
+2026-03-25 21:36:49,661 | INFO | Heartbeat
+2026-03-25 21:36:54,663 | INFO | Heartbeat
+2026-03-25 21:36:59,663 | INFO | Heartbeat
+2026-03-25 21:37:04,664 | INFO | Heartbeat
+2026-03-25 21:37:09,666 | INFO | Heartbeat
+2026-03-25 21:37:09,669 | INFO | Task Interval Task -> success
+2026-03-25 21:37:14,670 | INFO | Heartbeat
+2026-03-25 21:37:19,671 | INFO | Heartbeat
+2026-03-25 21:37:24,672 | INFO | Heartbeat
+2026-03-25 21:37:29,673 | INFO | Heartbeat
+2026-03-25 21:37:34,674 | INFO | Heartbeat
+2026-03-25 21:37:39,675 | INFO | Heartbeat
+2026-03-25 21:37:39,678 | INFO | Task Interval Task -> success
+2026-03-25 21:37:44,680 | INFO | Heartbeat
+2026-03-25 21:37:49,681 | INFO | Heartbeat
+2026-03-25 21:37:54,682 | INFO | Heartbeat
+2026-03-25 21:37:59,683 | INFO | Heartbeat
+2026-03-25 21:38:04,684 | INFO | Heartbeat
+2026-03-25 21:38:09,685 | INFO | Heartbeat
+2026-03-25 21:38:09,688 | INFO | Task Interval Task -> success
+2026-03-25 21:38:14,690 | INFO | Heartbeat
+2026-03-25 21:38:19,692 | INFO | Heartbeat
+2026-03-25 21:38:24,692 | INFO | Heartbeat
+2026-03-25 21:38:29,693 | INFO | Heartbeat
+2026-03-25 21:38:34,695 | INFO | Heartbeat
+2026-03-25 21:38:39,696 | INFO | Heartbeat
+2026-03-25 21:38:39,699 | INFO | Task Interval Task -> success
+2026-03-25 21:38:44,701 | INFO | Heartbeat
+2026-03-25 21:38:49,702 | INFO | Heartbeat
+2026-03-25 21:38:54,703 | INFO | Heartbeat
+2026-03-25 21:38:59,704 | INFO | Heartbeat
+2026-03-25 21:39:04,705 | INFO | Heartbeat
+2026-03-25 21:39:09,706 | INFO | Heartbeat
+2026-03-25 21:39:09,708 | INFO | Task Interval Task -> success
+2026-03-25 21:39:14,709 | INFO | Heartbeat
+2026-03-25 21:39:19,710 | INFO | Heartbeat
+2026-03-25 21:39:24,711 | INFO | Heartbeat
+2026-03-25 21:39:29,713 | INFO | Heartbeat
+2026-03-25 21:39:34,714 | INFO | Heartbeat
+2026-03-25 21:39:39,715 | INFO | Heartbeat
+2026-03-25 21:39:39,719 | INFO | Task Interval Task -> success
+2026-03-25 21:39:44,721 | INFO | Heartbeat
+2026-03-25 21:39:49,722 | INFO | Heartbeat
+2026-03-25 21:39:54,723 | INFO | Heartbeat
+2026-03-25 21:39:59,724 | INFO | Heartbeat
+2026-03-25 21:40:04,726 | INFO | Heartbeat
+2026-03-25 21:40:09,727 | INFO | Heartbeat
+2026-03-25 21:40:09,729 | INFO | Task Interval Task -> success
+2026-03-25 21:40:14,730 | INFO | Heartbeat
+2026-03-25 21:40:19,731 | INFO | Heartbeat
+2026-03-25 21:40:24,733 | INFO | Heartbeat
+2026-03-25 21:40:29,734 | INFO | Heartbeat
+2026-03-25 21:40:34,734 | INFO | Heartbeat
+2026-03-25 21:40:39,736 | INFO | Heartbeat
+2026-03-25 21:40:39,739 | INFO | Task Interval Task -> success
+2026-03-25 21:40:44,740 | INFO | Heartbeat
+2026-03-25 21:40:49,742 | INFO | Heartbeat
+2026-03-25 21:40:54,743 | INFO | Heartbeat
+2026-03-25 21:40:59,744 | INFO | Heartbeat
+2026-03-25 21:41:04,744 | INFO | Heartbeat
+2026-03-25 21:41:09,746 | INFO | Heartbeat
+2026-03-25 21:41:09,748 | INFO | Task Interval Task -> success
+2026-03-25 21:41:14,749 | INFO | Heartbeat
+2026-03-25 21:41:19,751 | INFO | Heartbeat
+2026-03-25 21:41:24,752 | INFO | Heartbeat
+2026-03-25 21:41:29,753 | INFO | Heartbeat
+2026-03-25 21:41:34,754 | INFO | Heartbeat
+2026-03-25 21:41:39,755 | INFO | Heartbeat
+2026-03-25 21:41:39,758 | INFO | Task Interval Task -> success
+2026-03-25 21:41:44,759 | INFO | Heartbeat
+2026-03-25 21:41:49,761 | INFO | Heartbeat
+2026-03-25 21:41:54,763 | INFO | Heartbeat
+2026-03-25 21:41:59,765 | INFO | Heartbeat
+2026-03-25 21:42:04,766 | INFO | Heartbeat
+2026-03-25 21:42:09,767 | INFO | Heartbeat
+2026-03-25 21:42:09,770 | INFO | Task Interval Task -> success
+2026-03-25 21:42:14,772 | INFO | Heartbeat
+2026-03-25 21:42:19,773 | INFO | Heartbeat
+2026-03-25 21:42:24,774 | INFO | Heartbeat
+2026-03-25 21:42:29,775 | INFO | Heartbeat
+2026-03-25 21:42:34,775 | INFO | Heartbeat
+2026-03-25 21:42:39,776 | INFO | Heartbeat
+2026-03-25 21:42:39,777 | INFO | Task Interval Task -> success
+2026-03-25 21:42:44,778 | INFO | Heartbeat
+2026-03-25 21:42:49,779 | INFO | Heartbeat
+2026-03-25 21:42:54,780 | INFO | Heartbeat
+2026-03-25 21:42:59,781 | INFO | Heartbeat
+2026-03-25 21:43:04,782 | INFO | Heartbeat
+2026-03-25 21:43:09,783 | INFO | Heartbeat
+2026-03-25 21:43:09,783 | INFO | Task Interval Task -> success
+2026-03-25 21:43:14,785 | INFO | Heartbeat
+2026-03-25 21:43:19,787 | INFO | Heartbeat
+2026-03-25 21:43:24,788 | INFO | Heartbeat
+2026-03-25 21:43:29,789 | INFO | Heartbeat
+2026-03-25 21:43:34,790 | INFO | Heartbeat
+2026-03-25 21:43:39,791 | INFO | Heartbeat
+2026-03-25 21:43:39,793 | INFO | Task Interval Task -> success
+2026-03-25 21:43:44,793 | INFO | Heartbeat
+2026-03-25 21:43:49,794 | INFO | Heartbeat
+2026-03-25 21:43:54,795 | INFO | Heartbeat
+2026-03-25 21:43:59,796 | INFO | Heartbeat
+2026-03-25 21:44:04,797 | INFO | Heartbeat
+2026-03-25 21:44:09,798 | INFO | Heartbeat
+2026-03-25 21:44:09,798 | INFO | Task Interval Task -> success
+2026-03-25 21:44:14,800 | INFO | Heartbeat
+2026-03-25 21:44:19,801 | INFO | Heartbeat
+2026-03-25 21:44:24,802 | INFO | Heartbeat
+2026-03-25 21:44:29,803 | INFO | Heartbeat
+2026-03-25 21:44:34,804 | INFO | Heartbeat
+2026-03-25 21:44:39,805 | INFO | Heartbeat
+2026-03-25 21:44:39,806 | INFO | Task Interval Task -> success
+2026-03-25 21:44:44,808 | INFO | Heartbeat
+2026-03-25 21:44:49,809 | INFO | Heartbeat
+2026-03-25 21:44:54,810 | INFO | Heartbeat
+2026-03-25 21:44:59,811 | INFO | Heartbeat
+2026-03-25 21:45:04,812 | INFO | Heartbeat
+2026-03-25 21:45:09,812 | INFO | Heartbeat
+2026-03-25 21:45:09,812 | INFO | Task Interval Task -> success
+2026-03-25 21:45:14,814 | INFO | Heartbeat
+2026-03-25 21:45:19,815 | INFO | Heartbeat
+2026-03-25 21:45:24,816 | INFO | Heartbeat
+2026-03-25 21:45:29,817 | INFO | Heartbeat
+2026-03-25 21:45:34,818 | INFO | Heartbeat
+2026-03-25 21:45:39,818 | INFO | Heartbeat
+2026-03-25 21:45:39,819 | INFO | Task Interval Task -> success
+2026-03-25 21:45:44,821 | INFO | Heartbeat
+2026-03-25 21:45:49,821 | INFO | Heartbeat
+2026-03-25 21:45:54,822 | INFO | Heartbeat
+2026-03-25 21:45:59,824 | INFO | Heartbeat
+2026-03-25 21:46:04,825 | INFO | Heartbeat
+2026-03-25 21:46:09,826 | INFO | Heartbeat
+2026-03-25 21:46:09,828 | INFO | Task Interval Task -> success
+2026-03-25 21:46:14,828 | INFO | Heartbeat
+2026-03-25 21:46:19,830 | INFO | Heartbeat
+2026-03-25 21:46:24,830 | INFO | Heartbeat
+2026-03-25 21:46:29,831 | INFO | Heartbeat
+2026-03-25 21:46:34,832 | INFO | Heartbeat
+2026-03-25 21:46:39,833 | INFO | Heartbeat
+2026-03-25 21:46:39,833 | INFO | Task Interval Task -> success
+2026-03-25 21:46:44,835 | INFO | Heartbeat
+2026-03-25 21:46:49,836 | INFO | Heartbeat
+2026-03-25 21:46:54,838 | INFO | Heartbeat
+2026-03-25 21:46:59,839 | INFO | Heartbeat
+2026-03-25 21:47:04,840 | INFO | Heartbeat
+2026-03-25 21:47:09,841 | INFO | Heartbeat
+2026-03-25 21:47:09,841 | INFO | Task Interval Task -> success
+2026-03-25 21:47:14,843 | INFO | Heartbeat
+2026-03-25 21:47:19,844 | INFO | Heartbeat
+2026-03-25 21:47:24,845 | INFO | Heartbeat
+2026-03-25 21:47:29,847 | INFO | Heartbeat
+2026-03-25 21:47:34,848 | INFO | Heartbeat
+2026-03-25 21:47:39,849 | INFO | Heartbeat
+2026-03-25 21:47:39,851 | INFO | Task Interval Task -> success
+2026-03-25 21:47:44,852 | INFO | Heartbeat
+2026-03-25 21:47:49,854 | INFO | Heartbeat
+2026-03-25 21:47:54,855 | INFO | Heartbeat
+2026-03-25 21:47:59,857 | INFO | Heartbeat
+2026-03-25 21:48:04,857 | INFO | Heartbeat
+2026-03-25 21:48:09,858 | INFO | Heartbeat
+2026-03-25 21:48:09,860 | INFO | Task Interval Task -> success
+2026-03-25 21:48:14,861 | INFO | Heartbeat
+2026-03-25 21:48:19,862 | INFO | Heartbeat
+2026-03-25 21:48:24,863 | INFO | Heartbeat
+2026-03-25 21:48:29,864 | INFO | Heartbeat
+2026-03-25 21:48:34,865 | INFO | Heartbeat
+2026-03-25 21:48:39,866 | INFO | Heartbeat
+2026-03-25 21:48:39,866 | INFO | Task Interval Task -> success
+2026-03-25 21:48:44,868 | INFO | Heartbeat
+2026-03-25 21:48:49,869 | INFO | Heartbeat
+2026-03-25 21:48:54,870 | INFO | Heartbeat
+2026-03-25 21:48:59,871 | INFO | Heartbeat
+2026-03-25 21:49:04,872 | INFO | Heartbeat
+2026-03-25 21:49:09,873 | INFO | Heartbeat
+2026-03-25 21:49:09,873 | INFO | Task Interval Task -> success
+2026-03-25 21:49:14,875 | INFO | Heartbeat
+2026-03-25 21:49:19,876 | INFO | Heartbeat
+2026-03-25 21:49:24,877 | INFO | Heartbeat
+2026-03-25 21:49:29,878 | INFO | Heartbeat
+2026-03-25 21:49:34,880 | INFO | Heartbeat
+2026-03-25 21:49:39,881 | INFO | Heartbeat
+2026-03-25 21:49:39,882 | INFO | Task Interval Task -> success
+2026-03-25 21:49:44,884 | INFO | Heartbeat
+2026-03-25 21:49:49,885 | INFO | Heartbeat
+2026-03-25 21:49:54,886 | INFO | Heartbeat
+2026-03-25 21:49:59,887 | INFO | Heartbeat
+2026-03-25 21:50:04,888 | INFO | Heartbeat
+2026-03-25 21:50:09,889 | INFO | Heartbeat
+2026-03-25 21:50:09,891 | INFO | Task Interval Task -> success
+2026-03-25 21:50:14,892 | INFO | Heartbeat
+2026-03-25 21:50:19,893 | INFO | Heartbeat
+2026-03-25 21:50:24,895 | INFO | Heartbeat
+2026-03-25 21:50:29,896 | INFO | Heartbeat
+2026-03-25 21:50:34,898 | INFO | Heartbeat
+2026-03-25 21:50:39,899 | INFO | Heartbeat
+2026-03-25 21:50:39,900 | INFO | Task Interval Task -> success
+2026-03-25 21:50:44,903 | INFO | Heartbeat
+2026-03-25 21:50:49,904 | INFO | Heartbeat
+2026-03-25 21:50:54,905 | INFO | Heartbeat
+2026-03-25 21:50:59,905 | INFO | Heartbeat
+2026-03-25 21:51:04,906 | INFO | Heartbeat
+2026-03-25 21:51:09,907 | INFO | Heartbeat
+2026-03-25 21:51:09,909 | INFO | Task Interval Task -> success
+2026-03-25 21:51:14,910 | INFO | Heartbeat
+2026-03-25 21:51:19,911 | INFO | Heartbeat
+2026-03-25 21:51:24,912 | INFO | Heartbeat
+2026-03-25 21:51:29,913 | INFO | Heartbeat
+2026-03-25 21:51:34,913 | INFO | Heartbeat
+2026-03-25 21:51:39,914 | INFO | Heartbeat
+2026-03-25 21:51:39,914 | INFO | Task Interval Task -> success
+2026-03-25 21:51:44,917 | INFO | Heartbeat
+2026-03-25 21:51:49,918 | INFO | Heartbeat
+2026-03-25 21:51:54,919 | INFO | Heartbeat
+2026-03-25 21:51:59,921 | INFO | Heartbeat
+2026-03-25 21:52:04,923 | INFO | Heartbeat
+2026-03-25 21:52:09,924 | INFO | Heartbeat
+2026-03-25 21:52:09,924 | INFO | Task Interval Task -> success
+2026-03-25 21:52:14,925 | INFO | Heartbeat
+2026-03-25 21:52:19,926 | INFO | Heartbeat
+2026-03-25 21:52:24,927 | INFO | Heartbeat
+2026-03-25 21:52:29,928 | INFO | Heartbeat
+2026-03-25 21:52:34,929 | INFO | Heartbeat
+2026-03-25 21:52:39,930 | INFO | Heartbeat
+2026-03-25 21:52:39,932 | INFO | Task Interval Task -> success
+2026-03-25 21:52:44,934 | INFO | Heartbeat
+2026-03-25 21:52:49,934 | INFO | Heartbeat
+2026-03-25 21:52:50,063 | INFO | Registered service: telegram
+2026-03-25 21:52:50,943 | INFO | Registered service: telegram
+2026-03-25 21:52:50,944 | INFO | Registered service: telegram
+2026-03-25 21:52:50,944 | INFO | Task Interval Task -> success
+2026-03-25 21:52:50,951 | INFO | Registered service: telegram
+2026-03-25 21:52:50,951 | INFO | Task Retry Reset Task -> success
+2026-03-25 21:52:50,951 | INFO | Registered service: telegram
+2026-03-25 21:52:50,957 | WARNING | Task Backoff Task failed (1/3). Retrying in 10s
+2026-03-25 21:52:50,957 | INFO | Registered service: telegram
+2026-03-25 21:52:50,957 | WARNING | Task Second Backoff Task failed (2/3). Retrying in 20s
+2026-03-25 21:52:50,957 | INFO | Registered service: telegram
+2026-03-25 21:52:50,964 | ERROR | Task Dead Bin Task exceeded max retries and was moved to dead_tasks.json
+2026-03-25 21:52:50,978 | INFO | Registered service: telegram
+2026-03-25 21:52:50,978 | INFO | Task One Time Task -> success
+2026-03-25 21:52:50,978 | INFO | Registered service: telegram
+2026-03-25 21:52:50,978 | INFO | Task Startup Task -> success
+2026-03-25 21:52:50,987 | INFO | Registered service: telegram
+2026-03-25 21:52:50,988 | INFO | Hub stopped
+2026-03-25 21:52:50,994 | INFO | Registered service: telegram
+2026-03-25 21:52:50,994 | INFO | Hub running
+2026-03-25 21:52:50,994 | INFO | Heartbeat
+2026-03-25 21:52:50,994 | INFO | Task Interval Task -> success
+2026-03-25 21:52:50,994 | INFO | Hub stopped
+2026-03-25 21:52:50,999 | INFO | Registered service: telegram
+2026-03-25 21:52:50,999 | INFO | Hub running
+2026-03-25 21:52:50,999 | INFO | Heartbeat
+2026-03-25 21:52:50,999 | WARNING | Task Failing Interval Task failed (1/3). Retrying in 10s
+2026-03-25 21:52:50,999 | INFO | Hub stopped
+2026-03-25 21:52:51,006 | INFO | Registered service: telegram
+2026-03-25 21:52:51,006 | INFO | Registered service: telegram
+2026-03-25 21:52:51,026 | INFO | Registered service: telegram
+2026-03-25 21:52:51,041 | WARNING | Ignoring invalid TELEGRAM_ALLOWED_USER_IDS entry: abc
+2026-03-25 21:52:51,041 | INFO | Registered service: telegram
+2026-03-25 21:52:54,935 | INFO | Heartbeat
+2026-03-25 21:52:59,937 | INFO | Heartbeat
+2026-03-25 21:53:04,937 | INFO | Heartbeat
+2026-03-25 21:53:09,939 | INFO | Heartbeat
+2026-03-25 21:53:09,941 | INFO | Task Interval Task -> success
+2026-03-25 21:53:14,941 | INFO | Heartbeat
+2026-03-25 21:53:19,942 | INFO | Heartbeat
+2026-03-25 21:53:24,944 | INFO | Heartbeat
+2026-03-25 21:53:26,209 | INFO | Registered service: telegram
+2026-03-25 21:53:26,209 | INFO | Registered service: telegram
+2026-03-25 21:53:29,945 | INFO | Heartbeat
+2026-03-25 21:53:34,946 | INFO | Heartbeat
+2026-03-25 21:53:39,947 | INFO | Heartbeat
+2026-03-25 21:53:39,947 | INFO | Task Interval Task -> success
+2026-03-25 21:53:41,672 | INFO | Registered service: telegram
+2026-03-25 21:53:41,675 | INFO | Registered service: telegram
+2026-03-25 21:53:41,675 | INFO | Task Interval Task -> success
+2026-03-25 21:53:41,680 | INFO | Registered service: telegram
+2026-03-25 21:53:41,680 | INFO | Task Retry Reset Task -> success
+2026-03-25 21:53:41,680 | INFO | Registered service: telegram
+2026-03-25 21:53:41,685 | WARNING | Task Backoff Task failed (1/3). Retrying in 10s
+2026-03-25 21:53:41,694 | INFO | Registered service: telegram
+2026-03-25 21:53:41,694 | WARNING | Task Second Backoff Task failed (2/3). Retrying in 20s
+2026-03-25 21:53:41,695 | INFO | Registered service: telegram
+2026-03-25 21:53:41,695 | ERROR | Task Dead Bin Task exceeded max retries and was moved to dead_tasks.json
+2026-03-25 21:53:41,721 | INFO | Registered service: telegram
+2026-03-25 21:53:41,722 | INFO | Task One Time Task -> success
+2026-03-25 21:53:41,726 | INFO | Registered service: telegram
+2026-03-25 21:53:41,727 | INFO | Task Startup Task -> success
+2026-03-25 21:53:41,731 | INFO | Registered service: telegram
+2026-03-25 21:53:41,731 | INFO | Hub stopped
+2026-03-25 21:53:41,736 | INFO | Registered service: telegram
+2026-03-25 21:53:41,736 | INFO | Hub running
+2026-03-25 21:53:41,736 | INFO | Heartbeat
+2026-03-25 21:53:41,736 | INFO | Task Interval Task -> success
+2026-03-25 21:53:41,736 | INFO | Hub stopped
+2026-03-25 21:53:41,742 | INFO | Registered service: telegram
+2026-03-25 21:53:41,742 | INFO | Hub running
+2026-03-25 21:53:41,742 | INFO | Heartbeat
+2026-03-25 21:53:41,742 | WARNING | Task Failing Interval Task failed (1/3). Retrying in 10s
+2026-03-25 21:53:41,742 | INFO | Hub stopped
+2026-03-25 21:53:41,749 | INFO | Registered service: telegram
+2026-03-25 21:53:41,749 | INFO | Registered service: telegram
+2026-03-25 21:53:41,762 | INFO | Registered service: telegram
+2026-03-25 21:53:41,783 | WARNING | Ignoring invalid TELEGRAM_ALLOWED_USER_IDS entry: abc
+2026-03-25 21:53:41,783 | INFO | Registered service: telegram
+2026-03-25 21:53:44,949 | INFO | Heartbeat
+2026-03-25 21:53:49,950 | INFO | Heartbeat
+2026-03-25 21:53:54,951 | INFO | Heartbeat
+2026-03-25 21:53:56,399 | INFO | Registered service: telegram
+2026-03-25 21:53:57,212 | INFO | Registered service: telegram
+2026-03-25 21:53:57,217 | INFO | Registered service: telegram
+2026-03-25 21:53:57,219 | INFO | Task Interval Task -> success
+2026-03-25 21:53:57,219 | INFO | Registered service: telegram
+2026-03-25 21:53:57,219 | INFO | Task Retry Reset Task -> success
+2026-03-25 21:53:57,225 | INFO | Registered service: telegram
+2026-03-25 21:53:57,225 | WARNING | Task Backoff Task failed (1/3). Retrying in 10s
+2026-03-25 21:53:57,233 | INFO | Registered service: telegram
+2026-03-25 21:53:57,233 | WARNING | Task Second Backoff Task failed (2/3). Retrying in 20s
+2026-03-25 21:53:57,233 | INFO | Registered service: telegram
+2026-03-25 21:53:57,233 | ERROR | Task Dead Bin Task exceeded max retries and was moved to dead_tasks.json
+2026-03-25 21:53:57,254 | INFO | Registered service: telegram
+2026-03-25 21:53:57,255 | INFO | Task One Time Task -> success
+2026-03-25 21:53:57,258 | INFO | Registered service: telegram
+2026-03-25 21:53:57,259 | INFO | Task Startup Task -> success
+2026-03-25 21:53:57,263 | INFO | Registered service: telegram
+2026-03-25 21:53:57,265 | INFO | Hub stopped
+2026-03-25 21:53:57,267 | INFO | Registered service: telegram
+2026-03-25 21:53:57,267 | INFO | Hub running
+2026-03-25 21:53:57,267 | INFO | Heartbeat
+2026-03-25 21:53:57,267 | INFO | Task Interval Task -> success
+2026-03-25 21:53:57,273 | INFO | Hub stopped
+2026-03-25 21:53:57,274 | INFO | Registered service: telegram
+2026-03-25 21:53:57,274 | INFO | Hub running
+2026-03-25 21:53:57,274 | INFO | Heartbeat
+2026-03-25 21:53:57,274 | WARNING | Task Failing Interval Task failed (1/3). Retrying in 10s
+2026-03-25 21:53:57,274 | INFO | Hub stopped
+2026-03-25 21:53:57,283 | INFO | Registered service: telegram
+2026-03-25 21:53:57,283 | INFO | Registered service: telegram
+2026-03-25 21:53:57,301 | INFO | Registered service: telegram
+2026-03-25 21:53:57,318 | WARNING | Ignoring invalid TELEGRAM_ALLOWED_USER_IDS entry: abc
+2026-03-25 21:53:57,318 | INFO | Registered service: telegram
+2026-03-25 21:53:59,952 | INFO | Heartbeat
+2026-03-25 21:54:04,954 | INFO | Heartbeat
+2026-03-25 21:54:09,954 | INFO | Heartbeat
+2026-03-25 21:54:09,957 | INFO | Task Interval Task -> success
+2026-03-25 21:54:14,958 | INFO | Heartbeat
+2026-03-25 21:54:19,959 | INFO | Heartbeat
+2026-03-25 21:54:24,960 | INFO | Heartbeat
