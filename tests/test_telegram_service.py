@@ -10,6 +10,7 @@ class FakeClient:
         self.updates = updates or []
         self.fail_on_get = fail_on_get
         self.sent_messages: list[tuple[int, str]] = []
+        self.commands_set: list[dict[str, str]] | None = None
         self.calls = 0
 
     def get_updates(self, offset=None, timeout=20) -> dict:
@@ -22,6 +23,10 @@ class FakeClient:
 
     def send_message(self, chat_id: int, text: str) -> dict:
         self.sent_messages.append((chat_id, text))
+        return {"ok": True}
+
+    def set_my_commands(self, commands: list[dict[str, str]]) -> dict:
+        self.commands_set = commands
         return {"ok": True}
 
 
@@ -176,6 +181,8 @@ def test_start_and_stop_service_lifecycle() -> None:
 
     service.start()
     assert service.is_running() is True
+    assert client.commands_set is not None
+    assert any(item["command"] == "help" for item in client.commands_set)
 
     service.stop()
     assert service.is_running() is False

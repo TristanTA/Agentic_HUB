@@ -165,3 +165,55 @@ def test_catalog_update_command_rejects_invalid_change() -> None:
     result = handlers.handle('/catalog update workers aria {"loadout_id":"missing_loadout"}', {})
     assert result.startswith("Catalog command failed")
     assert "Unknown loadout" in result
+
+
+def test_new_worker_wizard_uses_plain_inputs() -> None:
+    hub = DummyHub()
+    handlers = CommandHandlers(hub)
+    payload = {"source": "telegram", "chat_id": 1, "user_id": 2}
+
+    result = handlers.handle("/new", payload)
+    assert "Choose object type" in result
+
+    result = handlers.handle("1", payload)
+    assert "Field 1 of 5: name" in result
+
+    result = handlers.handle("Test Worker", payload)
+    assert "Field 2 of 5: type_id" in result
+    assert "agent_worker" in result
+
+    handlers.handle("agent_worker", payload)
+    handlers.handle("operator", payload)
+    handlers.handle("operator_core", payload)
+    result = handlers.handle("yes", payload)
+    assert result.startswith("Preview changes")
+    assert "enabled: True" in result
+
+    result = handlers.handle("confirm", payload)
+    assert result.startswith("Created worker")
+    assert "test_worker" in result
+
+
+def test_edit_worker_wizard_uses_plain_inputs() -> None:
+    hub = DummyHub()
+    handlers = CommandHandlers(hub)
+    payload = {"source": "telegram", "chat_id": 7, "user_id": 8}
+
+    result = handlers.handle("/edit", payload)
+    assert "Choose object type" in result
+
+    result = handlers.handle("workers", payload)
+    assert "Select worker" in result
+
+    result = handlers.handle("aria", payload)
+    assert "Editable fields:" in result
+
+    result = handlers.handle("enabled", payload)
+    assert "Answer yes or no." in result
+
+    result = handlers.handle("no", payload)
+    assert result.startswith("Preview changes")
+    assert "New value: False" in result
+
+    result = handlers.handle("confirm", payload)
+    assert result.startswith("Updated worker")

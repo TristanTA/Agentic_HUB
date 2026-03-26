@@ -10,6 +10,25 @@ from hub.integrations.telegram_client import TelegramClient
 
 
 class TelegramPollingService:
+    BOT_COMMANDS = [
+        {"command": "help", "description": "Show command guide"},
+        {"command": "status", "description": "Show hub status"},
+        {"command": "workers", "description": "List workers"},
+        {"command": "tasks", "description": "List tasks"},
+        {"command": "inspect", "description": "Inspect an object"},
+        {"command": "new", "description": "Create a new object"},
+        {"command": "edit", "description": "Edit an object"},
+        {"command": "delete", "description": "Delete or disable an object"},
+        {"command": "logs", "description": "Show recent logs"},
+        {"command": "tools", "description": "List tools"},
+        {"command": "loadouts", "description": "List loadouts"},
+        {"command": "roles", "description": "List roles"},
+        {"command": "types", "description": "List worker types"},
+        {"command": "pause", "description": "Pause a worker or the hub"},
+        {"command": "resume", "description": "Resume a worker or the hub"},
+        {"command": "retry", "description": "Retry failed work"},
+    ]
+
     def __init__(
         self,
         hub: Any,
@@ -33,6 +52,7 @@ class TelegramPollingService:
     def start(self) -> None:
         if self._running:
             return
+        self.client.set_my_commands(self.BOT_COMMANDS)
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._run_loop, name="telegram-polling", daemon=True)
         self._thread.start()

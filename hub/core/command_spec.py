@@ -31,10 +31,10 @@ CREATE_FIELDS = {
 }
 
 FIELD_HINTS = {
-    "enabled": "Enter true or false.",
-    "can_use_tools": "Enter true or false.",
-    "can_spawn_tasks": "Enter true or false.",
-    "can_request_approval": "Enter true or false.",
+    "enabled": "Answer yes or no.",
+    "can_use_tools": "Answer yes or no.",
+    "can_spawn_tasks": "Answer yes or no.",
+    "can_request_approval": "Answer yes or no.",
     "priority_bias": "Enter an integer.",
     "priority": "Enter an integer.",
     "interval_seconds": "Enter an integer or blank.",
@@ -44,4 +44,14 @@ FIELD_HINTS = {
     "tool_policy_overrides": "Enter JSON object of tool policy overrides.",
     "payload": "Enter JSON object.",
     "tags": "Enter JSON list of tags.",
+}
+
+CHOICE_SOURCES = {
+    "type_id": "worker_types",
+    "role_id": "worker_roles",
+    "loadout_id": "loadouts",
+    "memory_policy_ref": "memory_policies",
+    "safety_level": ["low", "medium", "high"],
+    "execution_mode": ["llm", "deterministic", "approval"],
+    "trigger": ["startup", "interval", "once", "manual"],
 }

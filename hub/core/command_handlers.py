@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from hub.core.command_spec import CREATE_FIELDS, KIND_LABELS, OBJECT_KINDS
+from hub.core.command_spec import CHOICE_SOURCES, CREATE_FIELDS, EDITABLE_FIELDS, FIELD_HINTS, KIND_LABELS, OBJECT_KINDS
 from hub.core.command_state import CommandSession
 from hub.runtime_status import build_runtime_status
 from hub.tasks import Task, utc_now
@@ -92,10 +92,10 @@ class CommandHandlers:
             if not kind:
                 return self._render("Invalid target", ["Reply with a valid object type or list number."], ["reply again", "cancel"])
             session.kind = kind
-            session.step = "object" if session.mode in {"edit", "delete"} else "payload"
+            session.step = "object" if session.mode in {"edit", "delete"} else "field"
             if session.mode == "new":
-                required = ", ".join(CREATE_FIELDS[kind])
-                return self._render(f"Create {KIND_LABELS[kind]}", [f"Reply with a JSON object including: {required}"], ["reply with JSON", "back", "cancel"])
+                session.metadata["field_index"] = 0
+                return self._prompt_field(session)
             rows = self._list_rows(kind)
             return self._render(f"Select {KIND_LABELS[kind]}", rows or ["No objects available."], ["reply with number or id", "back", "cancel"])
 
@@ -104,24 +104,17 @@ class CommandHandlers:
             if not object_id:
                 return self._render("Unknown object", ["Reply with a list number or object id."], ["reply again", "back", "cancel"])
             session.object_id = object_id
-            session.step = "confirm" if session.mode == "delete" else "payload"
+            session.step = "confirm" if session.mode == "delete" else "field"
             if session.mode == "delete":
                 deps = self._dependency_lines(session.kind or "", object_id)
                 return self._render(f"Delete {KIND_LABELS[session.kind or 'object']}", [f"Target: {object_id}", *deps], ["confirm", "back", "cancel"])
-            return self._render(
-                f"Edit {KIND_LABELS[session.kind or 'object']}",
-                [f"Target: {object_id}", "Reply with a JSON object of fields to update."],
-                ["reply with JSON", "back", "cancel"],
-            )
+            return self._prompt_edit_field(session)
 
-        if session.step == "payload":
-            try:
-                session.draft = json.loads(command)
-            except json.JSONDecodeError as exc:
-                return self._render("Invalid JSON", [str(exc)], ["reply again", "back", "cancel"])
-            session.step = "confirm"
-            preview = [f"{key}: {value}" for key, value in session.draft.items()]
-            return self._render("Preview changes", preview, ["confirm", "back", "cancel"])
+        if session.step == "field":
+            return self._handle_field_input(session, command)
+
+        if session.step == "value":
+            return self._handle_value_input(session, command)
 
         if session.step == "confirm":
             if lowered != "confirm":
@@ -132,6 +125,44 @@ class CommandHandlers:
 
         del self._sessions[session_key]
         return self._render("Wizard reset", ["Session state was invalid and has been cleared."], ["/help"])
+
+    def _handle_field_input(self, session: CommandSession, command: str) -> str:
+        if session.mode == "new":
+            fields = CREATE_FIELDS[session.kind or ""]
+            index = int(session.metadata.get("field_index", 0))
+            field_name = fields[index]
+            try:
+                session.draft[field_name] = self._parse_user_value(field_name, command)
+            except ValueError as exc:
+                return self._render(f"Invalid value for {field_name}", [str(exc)], ["reply again", "back", "cancel"])
+
+            index += 1
+            session.metadata["field_index"] = index
+            if index >= len(fields):
+                session.step = "confirm"
+                preview = [f"{key}: {value}" for key, value in session.draft.items()]
+                return self._render("Preview changes", preview, ["confirm", "back", "cancel"])
+            return self._prompt_field(session)
+
+        if session.mode == "edit":
+            field_name = command.strip()
+            if field_name not in EDITABLE_FIELDS[session.kind or ""]:
+                return self._render("Field not editable", ["Reply with one of the editable field names shown."], ["reply again", "back", "cancel"])
+            session.field_name = field_name
+            session.step = "value"
+            return self._prompt_edit_value(session)
+
+        return self._render("Wizard reset", ["Unsupported field step."], ["/help"])
+
+    def _handle_value_input(self, session: CommandSession, command: str) -> str:
+        field_name = session.field_name or ""
+        try:
+            session.draft = {field_name: self._parse_user_value(field_name, command)}
+        except ValueError as exc:
+            return self._render(f"Invalid value for {field_name}", [str(exc)], ["reply again", "back", "cancel"])
+        session.step = "confirm"
+        preview = [f"Field: {field_name}", f"New value: {session.draft[field_name]}"]
+        return self._render("Preview changes", preview, ["confirm", "back", "cancel"])
 
     def _commit_session(self, session: CommandSession) -> str:
         kind = session.kind or ""
@@ -156,7 +187,7 @@ class CommandHandlers:
                 "/tools, /loadouts, /roles, /types",
                 "/pause, /resume, /retry",
                 "Common objects: workers, worker_roles, worker_types, tools, loadouts, tasks",
-                "Example flow: /workers -> /inspect workers aria -> /edit",
+                "Example flow: /new -> worker -> answer prompts -> confirm",
             ],
             ["/status", "/workers", "/new"],
         )
@@ -199,6 +230,29 @@ class CommandHandlers:
     def _catalog_list(self, kind: str) -> str:
         title = {"workers": "Workers", "tools": "Tools", "loadouts": "Loadouts", "worker_roles": "Roles", "worker_types": "Worker types"}[kind]
         return self._render(title, self._list_rows(kind) or ["No objects available."], [f"/inspect {kind} <id>", "/edit", "/delete"])
+
+    def _prompt_field(self, session: CommandSession) -> str:
+        fields = CREATE_FIELDS[session.kind or ""]
+        index = int(session.metadata.get("field_index", 0))
+        field_name = fields[index]
+        body = [f"Field {index + 1} of {len(fields)}: {field_name}", self._field_hint(field_name)]
+        body.extend(self._choice_lines(field_name))
+        return self._render(f"Create {KIND_LABELS[session.kind or 'object']}", body, ["reply with value", "back", "cancel"])
+
+    def _prompt_edit_field(self, session: CommandSession) -> str:
+        fields = [f"- {field}" for field in EDITABLE_FIELDS[session.kind or ""]]
+        deps = self._dependency_lines(session.kind or "", session.object_id or "")
+        return self._render(
+            f"Edit {KIND_LABELS[session.kind or 'object']}",
+            [f"Target: {session.object_id}", "Editable fields:", *fields, *deps],
+            ["reply with field name", "back", "cancel"],
+        )
+
+    def _prompt_edit_value(self, session: CommandSession) -> str:
+        field_name = session.field_name or ""
+        body = [f"Field: {field_name}", self._field_hint(field_name)]
+        body.extend(self._choice_lines(field_name))
+        return self._render(f"Set {field_name}", body, ["reply with value", "back", "cancel"])
 
     def _inspect(self, command: str) -> str:
         parts = command.split(maxsplit=2)
@@ -399,3 +453,49 @@ class CommandHandlers:
     def _slugify(self, value: str) -> str:
         slug = value.strip().lower().replace(" ", "_")
         return "".join(ch for ch in slug if ch.isalnum() or ch == "_")
+
+    def _field_hint(self, field_name: str) -> str:
+        return FIELD_HINTS.get(field_name, f"Enter {field_name}.")
+
+    def _choice_lines(self, field_name: str) -> list[str]:
+        source = CHOICE_SOURCES.get(field_name)
+        if source is None:
+            return []
+        if isinstance(source, list):
+            return [f"Options: {', '.join(source)}"]
+        items = self.hub.catalog_manager.list_objects(source)
+        if source == "memory_policies":
+            ids = [self._catalog_identifier("memory_policies", item) for item in items]
+        else:
+            ids = [self._catalog_identifier(source, item) for item in items]
+        return [f"Options: {', '.join(ids)}"]
+
+    def _parse_user_value(self, field_name: str, raw: str) -> Any:
+        value = raw.strip()
+        lowered = value.lower()
+        if field_name in {"enabled", "can_use_tools", "can_spawn_tasks", "can_request_approval"}:
+            if lowered in {"yes", "y", "true", "on", "enabled"}:
+                return True
+            if lowered in {"no", "n", "false", "off", "disabled"}:
+                return False
+            raise ValueError("Please answer yes or no.")
+        if field_name in {"priority", "priority_bias", "interval_seconds"}:
+            if value == "" and field_name == "interval_seconds":
+                return None
+            return int(value)
+        if field_name in {"allowed_task_kinds", "allowed_tool_ids", "capability_tags", "tags"}:
+            if value.startswith("["):
+                parsed = json.loads(value)
+                if not isinstance(parsed, list):
+                    raise ValueError("Expected a list.")
+                return parsed
+            return [item.strip() for item in value.split(",") if item.strip()]
+        if field_name in {"tool_policy_overrides", "payload"}:
+            if not value:
+                return {}
+            return json.loads(value)
+        if field_name in {"type_id", "role_id", "loadout_id", "memory_policy_ref", "safety_level", "execution_mode", "trigger"}:
+            if lowered in {"none", "blank"} and field_name == "memory_policy_ref":
+                return None
+            return value
+        return value

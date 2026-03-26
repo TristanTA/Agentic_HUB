@@ -24,3 +24,12 @@ class TelegramClient:
         )
         r.raise_for_status()
         return r.json()
+
+    def set_my_commands(self, commands: list[dict[str, str]]) -> dict:
+        r = requests.post(
+            f"{self.base_url}/setMyCommands",
+            json={"commands": commands},
+            timeout=15,
+        )
+        r.raise_for_status()
+        return r.json()
