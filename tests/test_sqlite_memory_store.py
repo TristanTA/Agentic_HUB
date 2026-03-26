@@ -1,7 +1,7 @@
-from pathlib import Path
+﻿from pathlib import Path
 
-from hub.sqlite_memory_store import SQLiteMemoryStore
-from schemas.memory_records import RunEpisode, SemanticFact
+from agentic_hub.core.sqlite_memory_store import SQLiteMemoryStore
+from agentic_hub.models.memory_records import RunEpisode, SemanticFact
 
 
 def test_sqlite_memory_store_round_trip(tmp_path: Path):
@@ -27,3 +27,4 @@ def test_sqlite_memory_store_round_trip(tmp_path: Path):
     fact = store.get_active_semantic_fact("band_name")
     assert fact is not None
     assert fact.value == "New Name"
+

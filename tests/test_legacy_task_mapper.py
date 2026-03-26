@@ -1,8 +1,8 @@
-from datetime import timezone, datetime
+﻿from datetime import timezone, datetime
 
-from hub.legacy_task_mapper import legacy_task_to_runtime_task, runtime_result_to_legacy_result
-from hub.tasks import Task as LegacyTask
-from schemas.task_result import TaskResult as RuntimeTaskResult
+from agentic_hub.core.legacy_task_mapper import legacy_task_to_runtime_task, runtime_result_to_legacy_result
+from agentic_hub.core.legacy_tasks import Task as LegacyTask
+from agentic_hub.models.task_result import TaskResult as RuntimeTaskResult
 
 
 def test_legacy_task_to_runtime_task():
@@ -38,3 +38,5 @@ def test_runtime_result_to_legacy_result():
 
     assert legacy.status == "success"
     assert legacy.output["summary"] == "Completed"
+
+

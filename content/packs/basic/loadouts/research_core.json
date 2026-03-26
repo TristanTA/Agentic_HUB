@@ -1,0 +1,16 @@
+﻿{
+    "loadout_id":  "research_core",
+    "name":  "Research Core",
+    "description":  "Research-focused loadout for information gathering and runtime visibility.",
+    "memory_policy_ref":  "core_memory",
+    "allowed_tool_ids":  [
+                             "web_search",
+                             "hub_get_runtime_status",
+                             "hub_request_approval"
+                         ],
+    "tags":  [
+                 "research",
+                 "core"
+             ],
+    "source":  "seed"
+}

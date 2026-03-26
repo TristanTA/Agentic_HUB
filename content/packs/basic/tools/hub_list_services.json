@@ -1,0 +1,15 @@
+﻿{
+    "tool_id":  "hub_list_services",
+    "name":  "Hub List Services",
+    "description":  "Inspect registered services and their states.",
+    "capability_tags":  [
+                            "hub",
+                            "services",
+                            "read"
+                        ],
+    "safety_level":  "low",
+    "implementation_ref":  "agentic_hub.core.command_handlers.CommandHandlers._services",
+    "enabled":  true,
+    "source":  "seed"
+}
+

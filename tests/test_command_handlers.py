@@ -1,16 +1,16 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 import tempfile
 
 import pytest
 
-from hub.catalog_manager import CatalogManager
-from hub.core.command_handlers import CommandHandlers
-from hub.core.service_manager import ServiceManager
-from hub.core.task_types import HubTask
-from registries.tool_registry import ToolRegistry
-from registries.worker_registry import WorkerRegistry
+from agentic_hub.catalog.catalog_manager import CatalogManager
+from agentic_hub.core.command_handlers import CommandHandlers
+from agentic_hub.core.service_manager import ServiceManager
+from agentic_hub.core.task_types import HubTask
+from agentic_hub.catalog.tool_registry import ToolRegistry
+from agentic_hub.catalog.worker_registry import WorkerRegistry
 
 
 class DummyService:
@@ -40,8 +40,8 @@ class DummyHub:
         self.catalog_manager = CatalogManager(
             WorkerRegistry(),
             ToolRegistry(),
-            seed_dir=repo_root / "hub" / "catalog",
-            runtime_dir=self._runtime_dir,
+            packs_dir=repo_root / "content" / "packs",
+            overrides_dir=self._runtime_dir / "catalog_overrides",
         )
         self.catalog_manager.reload_catalog()
 
@@ -217,3 +217,5 @@ def test_edit_worker_wizard_uses_plain_inputs() -> None:
 
     result = handlers.handle("confirm", payload)
     assert result.startswith("Updated worker")
+
+

@@ -1,6 +1,6 @@
-from hub.legacy_worker_adapter import LegacyHandlerAdapter
-from schemas.task import Task
-from schemas.worker_instance import WorkerInstance
+﻿from agentic_hub.core.legacy_worker_adapter import LegacyHandlerAdapter
+from agentic_hub.models.task import Task
+from agentic_hub.models.worker_instance import WorkerInstance
 
 
 class DummyLogger:
@@ -25,3 +25,4 @@ def test_legacy_worker_adapter_runs_handler():
     result = adapter.run(worker, task)
     assert result.status == "done"
     assert result.output_payload["result"]["ok"] is True
+

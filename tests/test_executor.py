@@ -1,5 +1,5 @@
-from hub.executor import Executor
-from hub.tasks import Task
+﻿from agentic_hub.core.executor import Executor
+from agentic_hub.core.legacy_tasks import Task
 
 
 def test_executor_returns_success_for_valid_handler(caplog):
@@ -73,3 +73,4 @@ def test_executor_returns_failed_for_missing_handler():
     assert result.output is None
     assert result.error is not None
     assert "does_not_exist" in result.error
+

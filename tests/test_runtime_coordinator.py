@@ -1,14 +1,14 @@
-from hub.runtime_coordinator import RuntimeCoordinator
-from hub.legacy_worker_adapter import LegacyHandlerAdapter
-from registries.tool_registry import ToolRegistry
-from registries.worker_registry import WorkerRegistry
-from schemas.loadout import Loadout
-from schemas.memory_policy import MemoryPolicy
-from schemas.task import Task
-from schemas.tool_definition import ToolDefinition
-from schemas.worker_instance import WorkerInstance
-from schemas.worker_role import WorkerRole
-from schemas.worker_type import WorkerType
+﻿from agentic_hub.core.runtime_coordinator import RuntimeCoordinator
+from agentic_hub.core.legacy_worker_adapter import LegacyHandlerAdapter
+from agentic_hub.catalog.tool_registry import ToolRegistry
+from agentic_hub.catalog.worker_registry import WorkerRegistry
+from agentic_hub.models.loadout import Loadout
+from agentic_hub.models.memory_policy import MemoryPolicy
+from agentic_hub.models.task import Task
+from agentic_hub.models.tool_definition import ToolDefinition
+from agentic_hub.models.worker_instance import WorkerInstance
+from agentic_hub.models.worker_role import WorkerRole
+from agentic_hub.models.worker_type import WorkerType
 
 
 class DummyLogger:
@@ -25,7 +25,7 @@ def build_fixture():
             tool_id="telegram_send_message",
             name="Telegram",
             description="Send telegram message",
-            implementation_ref="hub.tools.telegram_tools.send_message",
+            implementation_ref="agentic_hub.services.telegram.tools.send_message",
         )
     )
 
@@ -94,3 +94,5 @@ def test_runtime_dispatch_task():
 
     assert result.status == "done"
     assert result.output_payload["result"]["sent"] is True
+
+

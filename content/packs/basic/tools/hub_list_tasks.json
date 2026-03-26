@@ -1,0 +1,15 @@
+﻿{
+    "tool_id":  "hub_list_tasks",
+    "name":  "Hub List Tasks",
+    "description":  "Inspect current hub tasks.",
+    "capability_tags":  [
+                            "hub",
+                            "tasks",
+                            "read"
+                        ],
+    "safety_level":  "low",
+    "implementation_ref":  "agentic_hub.core.command_handlers.CommandHandlers._tasks",
+    "enabled":  true,
+    "source":  "seed"
+}
+

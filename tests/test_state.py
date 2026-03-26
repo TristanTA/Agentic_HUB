@@ -1,7 +1,7 @@
-import json
+﻿import json
 from pathlib import Path
 
-from hub.state import HubState
+from agentic_hub.core.hub_state import HubState
 
 
 def test_hub_state_saves_to_json(tmp_path):
@@ -22,3 +22,4 @@ def test_hub_state_saves_to_json(tmp_path):
     assert data["run_id"] == "abc123"
     assert data["stop_requested"] is False
     assert data["last_error"] is None
+

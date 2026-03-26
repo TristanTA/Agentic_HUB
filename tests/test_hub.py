@@ -1,9 +1,9 @@
-import json
+﻿import json
 from datetime import timedelta
 
-import hub.hub as hub_module
-from hub.hub import Hub
-from hub.tasks import Task, TaskResult, utc_now
+import agentic_hub.core.hub as hub_module
+from agentic_hub.core.hub import Hub
+from agentic_hub.core.legacy_tasks import Task, TaskResult, utc_now
 
 
 def test_get_next_task_returns_highest_priority_due_task(tmp_path, monkeypatch):
@@ -501,3 +501,5 @@ def test_invalid_telegram_allowed_user_ids_are_ignored(tmp_path, monkeypatch):
 
     telegram = hub.service_manager._services["telegram"].service
     assert telegram.allowed_user_ids == {123, 456}
+
+

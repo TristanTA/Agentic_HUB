@@ -1,4 +1,4 @@
-from hub.approval_bridge import ApprovalBridge
+﻿from agentic_hub.core.approval_bridge import ApprovalBridge
 
 
 def test_parse_approve_command():
@@ -9,3 +9,4 @@ def test_parse_approve_command():
     assert cmd.action == "approve"
     assert cmd.approval_id == "abc123"
     assert cmd.note == "looks good"
+

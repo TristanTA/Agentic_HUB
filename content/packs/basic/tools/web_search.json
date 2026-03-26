@@ -1,0 +1,13 @@
+﻿{
+    "tool_id":  "web_search",
+    "name":  "Web Search",
+    "description":  "Search the public web for current information.",
+    "capability_tags":  [
+                            "search",
+                            "research"
+                        ],
+    "safety_level":  "medium",
+    "implementation_ref":  "hub.tools.web_search.search",
+    "enabled":  false,
+    "source":  "seed"
+}

@@ -1,0 +1,18 @@
+﻿{
+    "worker_id":  "atlas",
+    "name":  "Atlas",
+    "type_id":  "agent_worker",
+    "role_id":  "coordinator",
+    "loadout_id":  "coordinator_core",
+    "assigned_queues":  [
+                            "default"
+                        ],
+    "priority_bias":  3,
+    "owner":  "hub",
+    "enabled":  true,
+    "tags":  [
+                 "seed",
+                 "coordinator"
+             ],
+    "source":  "seed"
+}

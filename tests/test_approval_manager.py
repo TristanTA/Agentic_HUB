@@ -1,5 +1,5 @@
-from hub.approval_manager import ApprovalManager
-from schemas.approval import ApprovalRequest
+﻿from agentic_hub.core.approval_manager import ApprovalManager
+from agentic_hub.models.approval import ApprovalRequest
 
 
 def test_approval_manager_approve_flow():
@@ -19,3 +19,4 @@ def test_approval_manager_approve_flow():
     assert result.status == "approved"
     assert result.approver_id == "user123"
     assert manager.get_request_for_task("t1") is not None
+

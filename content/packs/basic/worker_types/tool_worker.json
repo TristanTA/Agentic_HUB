@@ -1,0 +1,15 @@
+﻿{
+    "type_id":  "tool_worker",
+    "name":  "Tool Worker",
+    "execution_mode":  "deterministic",
+    "can_use_tools":  true,
+    "can_spawn_tasks":  false,
+    "can_request_approval":  false,
+    "can_emit_artifacts":  true,
+    "allowed_task_kinds":  [
+                               "message",
+                               "service",
+                               "catalog"
+                           ],
+    "source":  "seed"
+}

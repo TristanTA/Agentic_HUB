@@ -1,6 +1,6 @@
-from hub.approval_manager import ApprovalManager
-from hub.approval_response_handler import ApprovalResponseHandler
-from schemas.approval import ApprovalRequest
+﻿from agentic_hub.core.approval_manager import ApprovalManager
+from agentic_hub.core.approval_response_handler import ApprovalResponseHandler
+from agentic_hub.models.approval import ApprovalRequest
 
 
 def test_handle_approve_message():
@@ -20,3 +20,4 @@ def test_handle_approve_message():
 
     assert text == "approved task1"
     assert manager.get_request("abc123").status == "approved"
+

@@ -1,0 +1,18 @@
+﻿{
+    "worker_id":  "sable",
+    "name":  "Sable",
+    "type_id":  "approval_worker",
+    "role_id":  "reviewer",
+    "loadout_id":  "review_core",
+    "assigned_queues":  [
+                            "default"
+                        ],
+    "priority_bias":  1,
+    "owner":  "hub",
+    "enabled":  true,
+    "tags":  [
+                 "seed",
+                 "reviewer"
+             ],
+    "source":  "seed"
+}

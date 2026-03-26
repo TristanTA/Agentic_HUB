@@ -1,0 +1,15 @@
+﻿{
+    "tool_id":  "hub_get_runtime_status",
+    "name":  "Hub Runtime Status",
+    "description":  "Read high-level runtime and catalog status.",
+    "capability_tags":  [
+                            "hub",
+                            "runtime",
+                            "read"
+                        ],
+    "safety_level":  "low",
+    "implementation_ref":  "agentic_hub.core.runtime_status.build_runtime_status",
+    "enabled":  true,
+    "source":  "seed"
+}
+

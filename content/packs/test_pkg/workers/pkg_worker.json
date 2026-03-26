@@ -1,0 +1,20 @@
+{
+  "worker_id": "pkg_worker",
+  "name": "Package Worker",
+  "type_id": "agent_worker",
+  "role_id": "operator",
+  "loadout_id": "operator_core",
+  "status": "enabled",
+  "health": "healthy",
+  "version": "0.1.0",
+  "assigned_queues": [],
+  "created_at": "2026-03-26T23:11:48.034376Z",
+  "updated_at": "2026-03-26T23:11:48.034376Z",
+  "tags": [],
+  "source": "package",
+  "package_id": "test_pkg",
+  "enabled": false,
+  "priority_bias": 0,
+  "owner": null,
+  "notes": ""
+}

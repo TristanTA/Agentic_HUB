@@ -1,0 +1,7 @@
+﻿{
+    "role_id":  "coordinator",
+    "name":  "Coordinator",
+    "purpose":  "Break down work, route tasks, and manage handoffs.",
+    "default_output_style":  "concise",
+    "source":  "seed"
+}

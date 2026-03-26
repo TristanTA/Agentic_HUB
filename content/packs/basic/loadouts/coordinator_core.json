@@ -1,0 +1,17 @@
+﻿{
+    "loadout_id":  "coordinator_core",
+    "name":  "Coordinator Core",
+    "description":  "Coordination loadout for planning, visibility, and catalog management.",
+    "memory_policy_ref":  "core_memory",
+    "allowed_tool_ids":  [
+                             "hub_get_runtime_status",
+                             "hub_list_tasks",
+                             "hub_manage_worker_catalog",
+                             "hub_request_approval"
+                         ],
+    "tags":  [
+                 "coordination",
+                 "core"
+             ],
+    "source":  "seed"
+}

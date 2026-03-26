@@ -1,0 +1,7 @@
+﻿{
+    "role_id":  "reviewer",
+    "name":  "Reviewer",
+    "purpose":  "Review outputs, validate policy, and flag approval needs.",
+    "default_output_style":  "structured",
+    "source":  "seed"
+}

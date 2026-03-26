@@ -1,0 +1,9 @@
+{
+  "pack_id": "test_pkg",
+  "name": "test_pkg",
+  "version": "1.0.0",
+  "description": "test_pkg",
+  "dependencies": [],
+  "conflicts": [],
+  "enabled_by_default": true
+}

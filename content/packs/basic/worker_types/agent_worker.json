@@ -1,0 +1,17 @@
+﻿{
+    "type_id":  "agent_worker",
+    "name":  "Agent Worker",
+    "execution_mode":  "llm",
+    "can_use_tools":  true,
+    "can_spawn_tasks":  true,
+    "can_request_approval":  true,
+    "can_emit_artifacts":  true,
+    "allowed_task_kinds":  [
+                               "research",
+                               "message",
+                               "plan",
+                               "catalog",
+                               "review"
+                           ],
+    "source":  "seed"
+}

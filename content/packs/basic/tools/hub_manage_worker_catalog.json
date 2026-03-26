@@ -1,0 +1,15 @@
+﻿{
+    "tool_id":  "hub_manage_worker_catalog",
+    "name":  "Hub Manage Worker Catalog",
+    "description":  "Create, update, and inspect worker catalog objects.",
+    "capability_tags":  [
+                            "hub",
+                            "catalog",
+                            "write"
+                        ],
+    "safety_level":  "high",
+    "implementation_ref":  "agentic_hub.catalog.catalog_manager.CatalogManager",
+    "enabled":  true,
+    "source":  "seed"
+}
+

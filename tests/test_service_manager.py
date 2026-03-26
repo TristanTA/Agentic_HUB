@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-from hub.core.service_manager import ServiceManager
+from agentic_hub.core.service_manager import ServiceManager
 
 
 class DummyService:
@@ -141,3 +141,4 @@ def test_list_status_returns_all_services() -> None:
     names = {row["name"] for row in rows}
 
     assert names == {"one", "two"}
+

@@ -1,5 +1,5 @@
-from hub.memory_manager import MemoryManager
-from schemas.memory_records import RunEpisode, SemanticFact, SessionEpisode
+﻿from agentic_hub.core.memory_manager import MemoryManager
+from agentic_hub.models.memory_records import RunEpisode, SemanticFact, SessionEpisode
 
 
 def test_memory_manager_builds_context():
@@ -40,3 +40,4 @@ def test_semantic_fact_supersedes_old_value():
     assert active is not None
     assert active.value == "New Name"
     assert any(item.status == "superseded" for item in history)
+

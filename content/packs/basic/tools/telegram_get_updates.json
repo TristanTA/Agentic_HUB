@@ -1,0 +1,15 @@
+﻿{
+    "tool_id":  "telegram_get_updates",
+    "name":  "Telegram Get Updates",
+    "description":  "Receive Telegram updates through the polling service abstraction.",
+    "capability_tags":  [
+                            "messaging",
+                            "telegram",
+                            "ingest"
+                        ],
+    "safety_level":  "low",
+    "implementation_ref":  "agentic_hub.services.telegram.service.TelegramPollingService._handle_update",
+    "enabled":  true,
+    "source":  "seed"
+}
+

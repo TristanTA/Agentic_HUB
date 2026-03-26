@@ -1,0 +1,7 @@
+﻿{
+    "role_id":  "researcher",
+    "name":  "Researcher",
+    "purpose":  "Gather information, summarize findings, and prepare options.",
+    "default_output_style":  "structured",
+    "source":  "seed"
+}

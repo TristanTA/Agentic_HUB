@@ -1,0 +1,14 @@
+﻿{
+    "type_id":  "approval_worker",
+    "name":  "Approval Worker",
+    "execution_mode":  "approval",
+    "can_use_tools":  false,
+    "can_spawn_tasks":  false,
+    "can_request_approval":  false,
+    "can_emit_artifacts":  true,
+    "allowed_task_kinds":  [
+                               "approval",
+                               "review"
+                           ],
+    "source":  "seed"
+}

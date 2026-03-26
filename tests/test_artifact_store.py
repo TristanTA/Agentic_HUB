@@ -1,5 +1,5 @@
-from hub.artifact_store import ArtifactStore
-from schemas.artifact import Artifact
+﻿from agentic_hub.core.artifact_store import ArtifactStore
+from agentic_hub.models.artifact import Artifact
 
 
 def test_artifact_store_saves_and_lists():
@@ -16,3 +16,4 @@ def test_artifact_store_saves_and_lists():
 
     assert store.get("a1").title == "Task Report"
     assert len(store.list_for_task("t1")) == 1
+

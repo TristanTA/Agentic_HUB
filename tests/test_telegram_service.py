@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import threading
 
-from hub.integrations.telegram_service import TelegramPollingService
+from agentic_hub.services.telegram.service import TelegramPollingService
 
 
 class FakeClient:
@@ -201,3 +201,5 @@ def test_status_reports_expected_fields() -> None:
     assert status["offset"] is None
     assert status["last_error"] is None
     assert status["allowed_user_ids"] == [123, 456]
+
+

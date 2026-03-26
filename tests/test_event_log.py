@@ -1,5 +1,5 @@
-from hub.event_log import EventLog
-from schemas.event import HubEvent
+﻿from agentic_hub.core.event_log import EventLog
+from agentic_hub.models.event import HubEvent
 
 
 def test_event_log_appends_and_filters():
@@ -9,3 +9,4 @@ def test_event_log_appends_and_filters():
 
     assert len(log.list_all()) == 2
     assert len(log.list_for_task("t1")) == 1
+

@@ -1,0 +1,7 @@
+﻿{
+    "role_id":  "operator",
+    "name":  "Operator",
+    "purpose":  "Execute approved actions and carry out direct tasks.",
+    "default_output_style":  "concise",
+    "source":  "seed"
+}

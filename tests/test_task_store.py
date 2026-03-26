@@ -1,7 +1,7 @@
-from datetime import timedelta
+﻿from datetime import timedelta
 
-from hub.task_store import TaskStore
-from hub.tasks import Task, utc_now
+from agentic_hub.core.task_store import TaskStore
+from agentic_hub.core.legacy_tasks import Task, utc_now
 
 
 def test_task_store_save_and_load_round_trip(tmp_path):
@@ -64,3 +64,4 @@ def test_task_store_load_missing_file_returns_empty_list(tmp_path):
     loaded = store.load()
 
     assert loaded == []
+

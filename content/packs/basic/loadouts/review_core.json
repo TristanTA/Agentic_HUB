@@ -1,0 +1,16 @@
+﻿{
+    "loadout_id":  "review_core",
+    "name":  "Review Core",
+    "description":  "Review loadout for oversight and approval support.",
+    "memory_policy_ref":  "core_memory",
+    "allowed_tool_ids":  [
+                             "hub_get_runtime_status",
+                             "hub_list_tasks",
+                             "hub_request_approval"
+                         ],
+    "tags":  [
+                 "review",
+                 "core"
+             ],
+    "source":  "seed"
+}

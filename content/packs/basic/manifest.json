@@ -1,0 +1,9 @@
+﻿{
+  "pack_id": "basic",
+  "name": "Basic",
+  "version": "1.0.0",
+  "description": "Baseline Agentic Hub content pack with core workers, tools, roles, types, loadouts, and memory policy.",
+  "dependencies": [],
+  "conflicts": [],
+  "enabled_by_default": true
+}

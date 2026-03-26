@@ -1,0 +1,14 @@
+﻿{
+    "tool_id":  "telegram_send_message",
+    "name":  "Telegram Send Message",
+    "description":  "Send a Telegram message to an allowed chat.",
+    "capability_tags":  [
+                            "messaging",
+                            "telegram"
+                        ],
+    "safety_level":  "medium",
+    "implementation_ref":  "agentic_hub.services.telegram.client.TelegramClient.send_message",
+    "enabled":  true,
+    "source":  "seed"
+}
+

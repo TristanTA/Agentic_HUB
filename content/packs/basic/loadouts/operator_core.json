@@ -1,0 +1,18 @@
+﻿{
+    "loadout_id":  "operator_core",
+    "name":  "Operator Core",
+    "description":  "Direct execution loadout for operational actions.",
+    "memory_policy_ref":  "core_memory",
+    "allowed_tool_ids":  [
+                             "telegram_send_message",
+                             "hub_list_tasks",
+                             "hub_list_services",
+                             "hub_get_runtime_status",
+                             "hub_request_approval"
+                         ],
+    "tags":  [
+                 "operator",
+                 "core"
+             ],
+    "source":  "seed"
+}

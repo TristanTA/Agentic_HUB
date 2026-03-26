@@ -1,14 +1,14 @@
-from hub.dispatcher import Dispatcher
-from hub.policy_resolver import PolicyResolver
-from registries.tool_registry import ToolRegistry
-from registries.worker_registry import WorkerRegistry
-from schemas.loadout import Loadout
-from schemas.memory_policy import MemoryPolicy
-from schemas.task import Task
-from schemas.tool_definition import ToolDefinition
-from schemas.worker_instance import WorkerInstance
-from schemas.worker_role import WorkerRole
-from schemas.worker_type import WorkerType
+﻿from agentic_hub.core.dispatcher import Dispatcher
+from agentic_hub.core.policy_resolver import PolicyResolver
+from agentic_hub.catalog.tool_registry import ToolRegistry
+from agentic_hub.catalog.worker_registry import WorkerRegistry
+from agentic_hub.models.loadout import Loadout
+from agentic_hub.models.memory_policy import MemoryPolicy
+from agentic_hub.models.task import Task
+from agentic_hub.models.tool_definition import ToolDefinition
+from agentic_hub.models.worker_instance import WorkerInstance
+from agentic_hub.models.worker_role import WorkerRole
+from agentic_hub.models.worker_type import WorkerType
 
 
 def build_fixture():
@@ -20,7 +20,7 @@ def build_fixture():
             tool_id="telegram_send_message",
             name="Telegram",
             description="Send a telegram message.",
-            implementation_ref="hub.tools.telegram_tools.send_message",
+            implementation_ref="agentic_hub.services.telegram.tools.send_message",
         )
     )
 
@@ -85,3 +85,5 @@ def test_select_worker_returns_matching_worker():
     worker = dispatcher.select_worker(task)
     assert worker is not None
     assert worker.worker_id == "aria"
+
+

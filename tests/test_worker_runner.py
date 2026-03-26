@@ -1,18 +1,18 @@
-from hub.approval_manager import ApprovalManager
-from hub.artifact_store import ArtifactStore
-from hub.event_log import EventLog
-from hub.policy_resolver import PolicyResolver
-from hub.worker_runner import WorkerRunner
-from registries.tool_registry import ToolRegistry
-from registries.worker_registry import WorkerRegistry
-from schemas.loadout import Loadout
-from schemas.memory_policy import MemoryPolicy
-from schemas.task import Task
-from schemas.task_result import TaskResult
-from schemas.tool_definition import ToolDefinition
-from schemas.worker_instance import WorkerInstance
-from schemas.worker_role import WorkerRole
-from schemas.worker_type import WorkerType
+﻿from agentic_hub.core.approval_manager import ApprovalManager
+from agentic_hub.core.artifact_store import ArtifactStore
+from agentic_hub.core.event_log import EventLog
+from agentic_hub.core.policy_resolver import PolicyResolver
+from agentic_hub.core.worker_runner import WorkerRunner
+from agentic_hub.catalog.tool_registry import ToolRegistry
+from agentic_hub.catalog.worker_registry import WorkerRegistry
+from agentic_hub.models.loadout import Loadout
+from agentic_hub.models.memory_policy import MemoryPolicy
+from agentic_hub.models.task import Task
+from agentic_hub.models.task_result import TaskResult
+from agentic_hub.models.tool_definition import ToolDefinition
+from agentic_hub.models.worker_instance import WorkerInstance
+from agentic_hub.models.worker_role import WorkerRole
+from agentic_hub.models.worker_type import WorkerType
 
 
 class DummyAdapter:
@@ -34,7 +34,7 @@ def build_fixture(require_approval: bool = False):
             tool_id="telegram_send_message",
             name="Telegram",
             description="Send message",
-            implementation_ref="hub.tools.telegram_tools.send_message",
+            implementation_ref="agentic_hub.services.telegram.tools.send_message",
         )
     )
 
@@ -130,3 +130,5 @@ def test_worker_runner_pauses_for_approval():
     assert result.status == "needs_approval"
     assert approval_manager.get_request_for_task("t2") is not None
     assert len(artifact_store.list_for_task("t2")) == 1
+
+

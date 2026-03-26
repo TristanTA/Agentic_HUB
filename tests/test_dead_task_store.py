@@ -1,5 +1,5 @@
-from hub.dead_task_store import DeadTaskStore
-from hub.tasks import DeadTaskRecord, utc_now
+﻿from agentic_hub.core.dead_task_store import DeadTaskStore
+from agentic_hub.core.legacy_tasks import DeadTaskRecord, utc_now
 
 
 def test_dead_task_store_append_and_load(tmp_path):
@@ -52,3 +52,4 @@ def test_dead_task_store_load_missing_file_returns_empty_list(tmp_path):
     loaded = store.load()
 
     assert loaded == []
+

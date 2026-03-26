@@ -1,6 +1,6 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-from hub.tools.telegram_tools import (
+from agentic_hub.services.telegram.tools import (
     start_telegram_service,
     stop_telegram_service,
     telegram_service_status,
@@ -74,3 +74,4 @@ def test_telegram_service_status_tool() -> None:
 
     assert result["name"] == "telegram"
     assert result["state"] == "stopped"
+

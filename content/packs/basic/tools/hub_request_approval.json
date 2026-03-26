@@ -1,0 +1,14 @@
+﻿{
+    "tool_id":  "hub_request_approval",
+    "name":  "Hub Request Approval",
+    "description":  "Create and manage approval-gated work.",
+    "capability_tags":  [
+                            "hub",
+                            "approval"
+                        ],
+    "safety_level":  "medium",
+    "implementation_ref":  "agentic_hub.core.approval_manager.ApprovalManager.create_request",
+    "enabled":  true,
+    "source":  "seed"
+}
+
