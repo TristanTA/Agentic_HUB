@@ -28,3 +28,6 @@ Thumbs.db
 # Runtime data / logs (Agentic Hub)
 data/
 logs/
+
+*.log
+*.json
