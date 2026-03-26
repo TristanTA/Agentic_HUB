@@ -31,3 +31,6 @@ class ToolRegistry:
 
     def has(self, tool_id: str) -> bool:
         return tool_id in self._tools
+
+    def clear(self) -> None:
+        self._tools.clear()

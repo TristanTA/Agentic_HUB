@@ -1,0 +1,55 @@
+[
+  {
+    "id": "76afcbe4-96f5-4add-ac65-cb0a7bacd5b3",
+    "name": "Startup Task",
+    "handler_name": "startup_task",
+    "priority": 1,
+    "enabled": true,
+    "trigger": "startup",
+    "interval_seconds": null,
+    "next_run_at": null,
+    "last_run_at": null,
+    "last_status": null,
+    "last_error": null,
+    "retry_count": 0,
+    "max_retries": 3,
+    "retry_delay_seconds": 10,
+    "payload": {}
+  },
+  {
+    "id": "495a381d-04f3-4e8d-9a02-84d70cc80947",
+    "name": "Start Telegram Service",
+    "handler_name": "start_service_task",
+    "priority": 2,
+    "enabled": true,
+    "trigger": "startup",
+    "interval_seconds": null,
+    "next_run_at": null,
+    "last_run_at": null,
+    "last_status": null,
+    "last_error": null,
+    "retry_count": 0,
+    "max_retries": 3,
+    "retry_delay_seconds": 10,
+    "payload": {
+      "service_name": "telegram"
+    }
+  },
+  {
+    "id": "b41c3bd7-f374-4c1b-a43d-cb77f487dc36",
+    "name": "Interval Task",
+    "handler_name": "interval_task",
+    "priority": 3,
+    "enabled": true,
+    "trigger": "interval",
+    "interval_seconds": 30,
+    "next_run_at": "2026-03-25T22:41:10.876345+00:00",
+    "last_run_at": null,
+    "last_status": null,
+    "last_error": null,
+    "retry_count": 0,
+    "max_retries": 3,
+    "retry_delay_seconds": 10,
+    "payload": {}
+  }
+]

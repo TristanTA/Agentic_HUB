@@ -1,5 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import Any, List
+from datetime import datetime, timezone
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class MemoryPolicy(BaseModel):
@@ -15,3 +20,6 @@ class MemoryPolicy(BaseModel):
         }
     )
     promotion_rules_ref: str | None = None
+    source: str = Field(default="runtime", description="seed, runtime, package")
+    package_id: str | None = None
+    updated_at: datetime = Field(default_factory=utc_now)

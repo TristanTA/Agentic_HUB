@@ -1,5 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import List
+from datetime import datetime, timezone
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class WorkerRole(BaseModel):
@@ -11,3 +16,6 @@ class WorkerRole(BaseModel):
     default_handoff_targets: List[str] = Field(default_factory=list)
     allowed_action_patterns: List[str] = Field(default_factory=list)
     blocked_action_patterns: List[str] = Field(default_factory=list)
+    source: str = Field(default="runtime", description="seed, runtime, package")
+    package_id: str | None = None
+    updated_at: datetime = Field(default_factory=utc_now)

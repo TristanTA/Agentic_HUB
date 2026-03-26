@@ -1,11 +1,18 @@
-from agent_os_starter_v2.registries.tool_registry import ToolRegistry
-from agent_os_starter_v2.registries.worker_registry import WorkerRegistry
-from agent_os_starter_v2.schemas.loadout import Loadout
-from agent_os_starter_v2.schemas.memory_policy import MemoryPolicy
-from agent_os_starter_v2.schemas.tool_definition import ToolDefinition
-from agent_os_starter_v2.schemas.worker_instance import WorkerInstance
-from agent_os_starter_v2.schemas.worker_role import WorkerRole
-from agent_os_starter_v2.schemas.worker_type import WorkerType
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from registries.tool_registry import ToolRegistry
+from registries.worker_registry import WorkerRegistry
+from schemas.loadout import Loadout
+from schemas.memory_policy import MemoryPolicy
+from schemas.tool_definition import ToolDefinition
+from schemas.worker_instance import WorkerInstance
+from schemas.worker_role import WorkerRole
+from schemas.worker_type import WorkerType
 
 
 def build_example() -> tuple[ToolRegistry, WorkerRegistry]:

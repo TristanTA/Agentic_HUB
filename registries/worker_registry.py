@@ -85,3 +85,22 @@ class WorkerRegistry:
 
     def worker_ids(self) -> Iterable[str]:
         return self._workers.keys()
+
+    def list_types(self) -> list[WorkerType]:
+        return list(self._types.values())
+
+    def list_roles(self) -> list[WorkerRole]:
+        return list(self._roles.values())
+
+    def list_loadouts(self) -> list[Loadout]:
+        return list(self._loadouts.values())
+
+    def list_memory_policies(self) -> list[MemoryPolicy]:
+        return list(self._memory_policies.values())
+
+    def clear(self) -> None:
+        self._workers.clear()
+        self._types.clear()
+        self._roles.clear()
+        self._loadouts.clear()
+        self._memory_policies.clear()

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
+
+from hub.runtime_status import build_runtime_status
 
 
 class CommandHandlers:
@@ -9,24 +13,31 @@ class CommandHandlers:
         self.hub = hub
 
     def handle(self, command: str, payload: dict[str, Any]) -> str:
-        command = command.strip().lower()
+        command = command.strip()
+        normalized = command.split(maxsplit=1)[0].lower() if command else ""
 
-        if command == "/ping":
+        if normalized == "/ping":
             return "hub alive"
 
-        if command == "/status":
+        if normalized == "/status":
             return self._status()
 
-        if command == "/tasks":
+        if normalized == "/tasks":
             return self._tasks()
 
-        if command == "/services":
+        if normalized == "/services":
             return self._services()
 
-        if command == "/help":
+        if normalized == "/help":
             return self._help()
 
-        return f"unknown command: {command}"
+        if normalized == "/runtime":
+            return self._runtime()
+
+        if normalized == "/catalog":
+            return self._catalog(command)
+
+        return f"unknown command: {normalized or command}"
 
     def _status(self) -> str:
         now = datetime.now(timezone.utc)
@@ -144,5 +155,118 @@ class CommandHandlers:
             "/status",
             "/tasks",
             "/services",
+            "/runtime",
+            "/catalog ...",
             "/help",
         ])
+
+    def _runtime(self) -> str:
+        return build_runtime_status(
+            self.hub.event_log,
+            self.hub.artifact_store,
+            self.hub.approval_manager,
+            self.hub.catalog_manager,
+        )
+
+    def _catalog(self, command: str) -> str:
+        parts = command.split(maxsplit=3)
+        if len(parts) == 1:
+            return self._catalog_help()
+
+        action = parts[1]
+        if action == "list":
+            if len(parts) < 3:
+                return "usage: /catalog list <tools|worker_types|worker_roles|loadouts|memory_policies|workers>"
+            kind = parts[2]
+            items = self.hub.catalog_manager.list_objects(kind)
+            if not items:
+                return f"no {kind}"
+            lines = [f"{kind}:"]
+            for item in items:
+                identifier = self._catalog_identifier(kind, item)
+                lines.append(f"- {identifier} | source={getattr(item, 'source', 'runtime')}")
+            return "\n".join(lines)
+
+        if action == "create":
+            if len(parts) < 4:
+                return "usage: /catalog create <kind> <json>"
+            kind = parts[2]
+            payload = json.loads(parts[3])
+            object_id = self.hub.catalog_manager.upsert(kind, payload)
+            return f"created {kind} {object_id}"
+
+        if action == "update":
+            if len(parts) < 4:
+                return "usage: /catalog update <kind> <id> <json>"
+            extra = parts[3].split(maxsplit=1)
+            if len(extra) != 2:
+                return "usage: /catalog update <kind> <id> <json>"
+            kind = parts[2]
+            object_id, raw_updates = extra
+            updates = json.loads(raw_updates)
+            self.hub.catalog_manager.update(kind, object_id, updates)
+            return f"updated {kind} {object_id}"
+
+        if action in {"enable", "disable"}:
+            if len(parts) < 4:
+                return "usage: /catalog enable|disable <tools|workers> <id>"
+            kind = parts[2]
+            object_id = parts[3]
+            self.hub.catalog_manager.set_enabled(kind, object_id, action == "enable")
+            return f"{action}d {kind} {object_id}"
+
+        if action == "assign":
+            if len(parts) < 4:
+                return "usage: /catalog assign worker <worker_id> <type|role|loadout> <value>"
+            extra = parts[3].split()
+            if parts[2] != "worker" or len(extra) != 3:
+                return "usage: /catalog assign worker <worker_id> <type|role|loadout> <value>"
+            worker_id, target, value = extra
+            mapping = {"type": "type_id", "role": "role_id", "loadout": "loadout_id"}
+            self.hub.catalog_manager.assign_worker(worker_id, mapping[target], value)
+            return f"assigned worker {worker_id} {target}={value}"
+
+        if action == "import":
+            if len(parts) < 3:
+                return "usage: /catalog import <path> [--override]"
+            arg_parts = command.split()[2:]
+            allow_override = "--override" in arg_parts
+            path = Path(next(part for part in arg_parts if part != "--override"))
+            counts = self.hub.catalog_manager.import_package(path, allow_override=allow_override)
+            summary = ", ".join(f"{kind}={count}" for kind, count in counts.items() if count)
+            return f"imported package from {path}: {summary or 'no objects'}"
+
+        if action == "export":
+            if len(parts) < 3:
+                return "usage: /catalog export <path>"
+            path = Path(command.split(maxsplit=2)[2])
+            exported = self.hub.catalog_manager.export_package(path)
+            return f"exported package to {exported}"
+
+        return self._catalog_help()
+
+    def _catalog_help(self) -> str:
+        return "\n".join(
+            [
+                "catalog commands:",
+                "/catalog list <kind>",
+                "/catalog create <kind> <json>",
+                "/catalog update <kind> <id> <json>",
+                "/catalog enable <tools|workers> <id>",
+                "/catalog disable <tools|workers> <id>",
+                "/catalog assign worker <worker_id> <type|role|loadout> <value>",
+                "/catalog import <path> [--override]",
+                "/catalog export <path>",
+            ]
+        )
+
+    def _catalog_identifier(self, kind: str, item: Any) -> str:
+        fields = {
+            "tools": "tool_id",
+            "worker_types": "type_id",
+            "worker_roles": "role_id",
+            "loadouts": "loadout_id",
+            "memory_policies": "policy_id",
+            "workers": "worker_id",
+        }
+        return str(getattr(item, fields[kind]))

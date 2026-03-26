@@ -1,5 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import Any, List
+from datetime import datetime, timezone
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class Loadout(BaseModel):
@@ -18,3 +23,6 @@ class Loadout(BaseModel):
     tool_policy_overrides: dict[str, Any] = Field(default_factory=dict)
     default_task_templates: List[str] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
+    source: str = Field(default="runtime", description="seed, runtime, package")
+    package_id: str | None = None
+    updated_at: datetime = Field(default_factory=utc_now)

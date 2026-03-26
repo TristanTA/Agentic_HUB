@@ -20,3 +20,5 @@ class WorkerBase(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
     tags: List[str] = Field(default_factory=list)
+    source: str = Field(default="runtime", description="seed, runtime, package")
+    package_id: str | None = None

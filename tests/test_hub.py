@@ -454,3 +454,50 @@ def test_hub_creates_default_tasks_file_when_missing(tmp_path, monkeypatch):
 
     assert task_file.exists()
     assert len(hub.tasks) >= 1
+
+
+def test_hub_bootstraps_catalog_and_persists_runtime_workers(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    task_file = tmp_path / "tasks.json"
+    dead_file = tmp_path / "dead_tasks.json"
+    runtime_catalog_dir = tmp_path / "catalog"
+
+    monkeypatch.setattr(hub_module, "STATE_FILE", state_file)
+    monkeypatch.setattr(hub_module, "TASKS_FILE", task_file)
+    monkeypatch.setattr(hub_module, "DEAD_TASKS_FILE", dead_file)
+    monkeypatch.setattr(hub_module, "CATALOG_RUNTIME_DIR", runtime_catalog_dir)
+
+    hub = Hub()
+    assert any(worker.worker_id == "aria" for worker in hub.worker_registry.list_workers())
+
+    hub.catalog_manager.upsert(
+        "workers",
+        {
+            "worker_id": "persisted_worker",
+            "name": "Persisted Worker",
+            "type_id": "agent_worker",
+            "role_id": "operator",
+            "loadout_id": "operator_core",
+        },
+    )
+
+    restarted = Hub()
+
+    assert any(worker.worker_id == "persisted_worker" for worker in restarted.worker_registry.list_workers())
+
+
+def test_invalid_telegram_allowed_user_ids_are_ignored(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    task_file = tmp_path / "tasks.json"
+    dead_file = tmp_path / "dead_tasks.json"
+
+    monkeypatch.setattr(hub_module, "STATE_FILE", state_file)
+    monkeypatch.setattr(hub_module, "TASKS_FILE", task_file)
+    monkeypatch.setattr(hub_module, "DEAD_TASKS_FILE", dead_file)
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "fake-token")
+    monkeypatch.setenv("TELEGRAM_ALLOWED_USER_IDS", "123, abc, 456")
+
+    hub = Hub()
+
+    telegram = hub.service_manager._services["telegram"].service
+    assert telegram.allowed_user_ids == {123, 456}

@@ -1,0 +1,54 @@
+[
+  {
+    "worker_id": "aria",
+    "name": "Aria",
+    "type_id": "agent_worker",
+    "role_id": "operator",
+    "loadout_id": "operator_core",
+    "assigned_queues": ["default"],
+    "priority_bias": 2,
+    "owner": "hub",
+    "enabled": true,
+    "tags": ["seed", "operator"],
+    "source": "seed"
+  },
+  {
+    "worker_id": "atlas",
+    "name": "Atlas",
+    "type_id": "agent_worker",
+    "role_id": "coordinator",
+    "loadout_id": "coordinator_core",
+    "assigned_queues": ["default"],
+    "priority_bias": 3,
+    "owner": "hub",
+    "enabled": true,
+    "tags": ["seed", "coordinator"],
+    "source": "seed"
+  },
+  {
+    "worker_id": "sable",
+    "name": "Sable",
+    "type_id": "approval_worker",
+    "role_id": "reviewer",
+    "loadout_id": "review_core",
+    "assigned_queues": ["default"],
+    "priority_bias": 1,
+    "owner": "hub",
+    "enabled": true,
+    "tags": ["seed", "reviewer"],
+    "source": "seed"
+  },
+  {
+    "worker_id": "relay_1",
+    "name": "Relay 1",
+    "type_id": "tool_worker",
+    "role_id": "operator",
+    "loadout_id": "operator_core",
+    "assigned_queues": ["default"],
+    "priority_bias": 1,
+    "owner": "hub",
+    "enabled": true,
+    "tags": ["seed", "relay"],
+    "source": "seed"
+  }
+]

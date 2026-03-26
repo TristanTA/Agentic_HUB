@@ -5,10 +5,18 @@ from datetime import timedelta
 
 from dotenv import load_dotenv
 
+from hub.approval_manager import ApprovalManager
+from hub.artifact_store import ArtifactStore
+from hub.catalog_manager import CatalogManager
 from hub.config import DEAD_TASKS_FILE, HEARTBEAT_SECONDS, STATE_FILE, TASKS_FILE
+from hub.config import CATALOG_RUNTIME_DIR, CATALOG_SEED_DIR
 from hub.dead_task_store import DeadTaskStore
+from hub.event_log import EventLog
 from hub.executor import Executor
+from hub.legacy_worker_adapter import LegacyHandlerAdapter
 from hub.logger import get_logger
+from hub.memory_manager import MemoryManager
+from hub.runtime_coordinator import RuntimeCoordinator
 from hub.state import HubState
 from hub.task_store import TaskStore
 from hub.tasks import DeadTaskRecord, Task, TaskResult, utc_now
@@ -17,6 +25,8 @@ from hub.core.command_handlers import CommandHandlers
 from hub.core.task_types import HubTask
 from hub.integrations.telegram_service import TelegramPollingService
 import hub.handlers as handlers
+from registries.tool_registry import ToolRegistry
+from registries.worker_registry import WorkerRegistry
 
 
 class Hub:
@@ -26,6 +36,38 @@ class Hub:
         self.logger = get_logger()
         self.state = HubState()
         self.service_manager = ServiceManager()
+        self.tool_registry = ToolRegistry()
+        self.worker_registry = WorkerRegistry()
+        self.approval_manager = ApprovalManager()
+        self.artifact_store = ArtifactStore()
+        self.event_log = EventLog()
+        self.memory_manager = MemoryManager()
+        self.catalog_manager = CatalogManager(
+            self.worker_registry,
+            self.tool_registry,
+            seed_dir=CATALOG_SEED_DIR,
+            runtime_dir=CATALOG_RUNTIME_DIR,
+        )
+        self.catalog_manager.reload_catalog()
+        self.runtime_coordinator = RuntimeCoordinator(
+            self.worker_registry,
+            self.tool_registry,
+            approval_manager=self.approval_manager,
+            artifact_store=self.artifact_store,
+            event_log=self.event_log,
+            memory_manager=self.memory_manager,
+        )
+        self.runtime_coordinator.register_adapter(
+            "tool_worker",
+            LegacyHandlerAdapter(
+                handlers={
+                    "startup_task": handlers.startup_task,
+                    "start_service_task": lambda payload: handlers.start_service_task(payload, hub=self),
+                    "interval_task": handlers.interval_task,
+                },
+                logger=self.logger,
+            ),
+        )
 
         self._register_services()
 
@@ -52,10 +94,18 @@ class Hub:
     def _register_services(self) -> None:
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
         allowed_raw = os.getenv("TELEGRAM_ALLOWED_USER_IDS", "")
-
-        allowed_user_ids = {
-            int(x.strip()) for x in allowed_raw.split(",") if x.strip()
-        }
+        allowed_user_ids: set[int] = set()
+        for raw_value in allowed_raw.split(","):
+            value = raw_value.strip()
+            if not value:
+                continue
+            try:
+                allowed_user_ids.add(int(value))
+            except ValueError:
+                self.logger.warning(
+                    "Ignoring invalid TELEGRAM_ALLOWED_USER_IDS entry: %s",
+                    value,
+                )
 
         if not bot_token:
             self.logger.warning("TELEGRAM_BOT_TOKEN not set; telegram service not registered")
