@@ -372,6 +372,44 @@ def test_managed_mode_topic_replies_stay_in_thread() -> None:
     assert client.sent_messages[-1] == (777, "aria: hello topic", 9)
 
 
+def test_managed_mode_general_topic_normalizes_thread_id_to_root_chat() -> None:
+    hub = FakeHub()
+    client = FakeClient()
+    service = TelegramPollingService(
+        hub=hub,
+        bot_token="fake-token",
+        allowed_user_ids={123},
+        allowed_chat_ids={777},
+        poll_timeout=0,
+        idle_sleep=0,
+        mode="managed",
+        worker_id="aria",
+        bot_username="aria_bot",
+    )
+    service.client = client
+
+    service._handle_update(
+        {
+            "update_id": 306,
+            "message": {
+                "message_id": 18,
+                "message_thread_id": 1,
+                "text": "@aria_bot hello general",
+                "chat": {"id": 777, "type": "supergroup"},
+                "from": {"id": 555},
+            },
+        }
+    )
+
+    assert hub.managed_messages[-1] == (
+        "aria",
+        "hello general",
+        {"source": "telegram_managed", "chat_id": 777, "message_thread_id": None, "user_id": 555, "chat_type": "supergroup"},
+    )
+    assert client.chat_actions[-1] == (777, "typing", None)
+    assert client.sent_messages[-1] == (777, "aria: hello general", None)
+
+
 def test_managed_mode_ignores_bot_authors() -> None:
     hub = FakeHub()
     client = FakeClient()

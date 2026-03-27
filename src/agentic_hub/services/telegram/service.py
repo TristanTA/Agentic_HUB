@@ -54,11 +54,12 @@ class TelegramPollingService:
             return
         self.client.set_my_commands(self.BOT_COMMANDS)
         self.logger.info(
-            "Starting telegram polling service: mode=%s worker=%s bot_username=%s allowed_users=%s",
+            "Starting telegram polling service: mode=%s worker=%s bot_username=%s allowed_users=%s allowed_chats=%s",
             self.mode,
             self.worker_id,
             self.bot_username,
             sorted(self.allowed_user_ids),
+            sorted(self.allowed_chat_ids),
         )
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._run_loop, name="telegram-polling", daemon=True)
@@ -131,7 +132,7 @@ class TelegramPollingService:
         chat = message.get("chat", {})
         chat_id = chat.get("id")
         chat_type = chat.get("type", "private")
-        message_thread_id = message.get("message_thread_id")
+        message_thread_id = self._normalize_message_thread_id(chat_type=chat_type, message_thread_id=message.get("message_thread_id"))
         text = (message.get("text") or "").strip()
         if self.mode == "managed":
             self.logger.info(
@@ -213,7 +214,17 @@ class TelegramPollingService:
                     )
                 except Exception as exc:
                     self.logger.warning("Failed to persist allowed chat for worker=%s chat_id=%s: %s", self.worker_id, chat_id, exc)
-            self.client.send_message(chat_id, routed, message_thread_id=message_thread_id)
+            try:
+                self.client.send_message(chat_id, routed, message_thread_id=message_thread_id)
+            except Exception as exc:
+                self._last_error = str(exc)
+                self.logger.error(
+                    "Managed telegram reply failed: worker=%s chat_id=%s thread_id=%s error=%s",
+                    self.worker_id,
+                    chat_id,
+                    message_thread_id,
+                    exc,
+                )
             return
 
         task = HubTask(
@@ -326,5 +337,13 @@ class TelegramPollingService:
         if not self.allowed_user_ids:
             return {"allowed": True, "should_allow_chat": False}
         return {"allowed": user_id in self.allowed_user_ids, "should_allow_chat": False}
+
+    def _normalize_message_thread_id(self, *, chat_type: str, message_thread_id: int | None) -> int | None:
+        # Telegram's "General" forum topic behaves like the root supergroup thread.
+        # Sending replies with message_thread_id=1 can fail or disappear, so we treat it
+        # as an unthreaded supergroup message.
+        if chat_type == "supergroup" and message_thread_id == 1:
+            return None
+        return message_thread_id
 
 
