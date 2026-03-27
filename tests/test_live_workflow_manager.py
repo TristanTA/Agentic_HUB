@@ -12,6 +12,8 @@ from agentic_hub.core.event_log import EventLog
 from agentic_hub.core.live_agent_worker_adapter import LiveAgentWorkerAdapter
 from agentic_hub.core.live_workflow_manager import LiveWorkflowManager
 from agentic_hub.core.runtime_coordinator import RuntimeCoordinator
+from agentic_hub.models.artifact import Artifact
+from agentic_hub.models.task import Task
 
 
 def build_runtime(tmp_path: Path):
@@ -117,3 +119,84 @@ def test_live_workflow_end_to_end(tmp_path, monkeypatch) -> None:
     reloaded = reloaded_manager.get_workflow(workflow.workflow_id)
     assert reloaded.status == "completed"
     assert reloaded.verification_artifact_id is not None
+
+
+def test_invalid_worker_schema_change_is_rejected_before_approval(tmp_path, monkeypatch) -> None:
+    workspace, runtime_dir, coordinator, artifact_store, approval_manager, adapter = build_runtime(tmp_path)
+
+    monkeypatch.setattr(
+        adapter,
+        "_generate_change_set",
+        lambda worker, objective, target_worker_id, research_brief: {
+            "summary": "Bad change set",
+            "file_operations": [
+                {
+                    "path": "content/packs/basic/workers/aria.json",
+                    "action": "update",
+                    "reason": "Invalid worker fields",
+                    "content": '{"worker_id":"aria","name":"Aria","type_id":"agent_worker","role_id":"band_assistant","loadout_id":"aria_band_core","prompt_refs":["bad"]}',
+                }
+            ],
+            "verification_commands": ["jq '.x' file.json"],
+            "risks": [],
+        },
+    )
+
+    research_artifact = Artifact(
+        artifact_id="research-1",
+        task_id="research-task",
+        worker_id="nova",
+        kind="research_brief",
+        title="brief",
+        content={"summary": "brief"},
+    )
+    artifact_store.save(research_artifact)
+
+    task = Task(
+        task_id="impl-1",
+        kind="implementation_request",
+        target_worker_id="forge",
+        payload={
+            "workflow_id": "wf-1",
+            "target_worker_id": "aria",
+            "objective": "Fix Aria",
+            "research_artifact_id": "research-1",
+        },
+    )
+    worker = coordinator.worker_registry.get_worker("forge")
+    result = adapter.run(worker, task)
+    assert result.status == "failed"
+    assert "unsupported fields" in (result.error or "")
+    assert approval_manager.list_pending() == []
+
+
+def test_verification_commands_are_generated_for_windows(tmp_path) -> None:
+    workspace, runtime_dir, coordinator, artifact_store, approval_manager, adapter = build_runtime(tmp_path)
+
+    change_set = adapter._normalize_change_set(
+        {
+            "summary": "Create a soul file",
+            "file_operations": [
+                {
+                    "path": "content/packs/basic/worker_docs/aria/soul.md",
+                    "action": "create",
+                    "reason": "Add soul guidance",
+                    "content": "# Soul",
+                },
+                {
+                    "path": "content/packs/basic/loadouts/aria_band_core.json",
+                    "action": "update",
+                    "reason": "Update loadout",
+                    "content": '{"loadout_id":"aria_band_core","name":"Aria Band Core","memory_policy_ref":"core_memory"}',
+                },
+            ],
+            "verification_commands": ["jq '.x' file.json", "python3 -c 'print(1)'"],
+            "risks": [],
+        }
+    )
+
+    commands = change_set["verification_commands"]
+    assert commands
+    assert all("jq " not in command for command in commands)
+    assert all("python3" not in command for command in commands)
+    assert any("ConvertFrom-Json" in command for command in commands)

@@ -120,11 +120,11 @@ class DummyWorkflowManager:
             "Workflow",
             (),
             {
-                "workflow_id": "wf-1",
+                "workflow_id": "wf-12345",
                 "target_worker_id": target_worker_id,
                 "objective": objective,
                 "status": "awaiting_approval",
-                "approval_id": "approval-1",
+                "approval_id": "approval-12345",
             },
         )()
         self.items = [workflow]
@@ -135,14 +135,14 @@ class DummyWorkflowManager:
 
     def inspect_workflow(self, workflow_id: str):
         return {
-            "workflow_id": workflow_id,
+            "workflow_id": "wf-12345",
             "target_worker_id": "aria",
             "objective": "Improve aria soul",
             "status": "awaiting_approval",
-            "approval_id": "approval-1",
+            "approval_id": "approval-12345",
             "failure_reason": None,
-            "tasks": [{"task_id": "t1", "kind": "research_request", "status": "done", "summary": "done"}],
-            "artifacts": [{"artifact_id": "a1", "kind": "research_brief", "title": "brief"}],
+            "tasks": [{"task_id": "task-12345", "kind": "research_request", "status": "done", "summary": "done"}],
+            "artifacts": [{"artifact_id": "artifact-12345", "kind": "research_brief", "title": "brief"}],
         }
 
     def resume_approved_workflow(self, approval_id: str):
@@ -155,6 +155,9 @@ class DummyWorkflowManager:
 class DummyApprovalManager:
     def list_pending(self):
         return []
+
+    def list_all(self):
+        return [type("Approval", (), {"approval_id": "approval-12345"})()]
 
     def approve(self, approval_id: str, approver_id: str, note: str | None = None):
         return {"approval_id": approval_id, "approver_id": approver_id, "note": note}
@@ -375,8 +378,8 @@ def test_improve_worker_command() -> None:
     result = handlers.handle("/improve-worker aria improve aria soul", {"user_id": 1, "chat_id": 2})
 
     assert result.startswith("Worker improvement started")
-    assert "wf-1" in result
-    assert "approval-1" in result
+    assert "wf-12345" in result
+    assert "approval-12345" in result
 
 
 def test_workflow_commands() -> None:
@@ -386,18 +389,19 @@ def test_workflow_commands() -> None:
 
     result = handlers.handle("/workflows", {})
     assert result.startswith("Live workflows")
-    assert "wf-1" in result
+    assert "wf-12" in result
 
-    detail = handlers.handle("/workflow wf-1", {})
+    detail = handlers.handle("/workflow wf-123", {})
     assert detail.startswith("Workflow details")
     assert "research_request" in detail
+    assert "approval-12345" in detail
 
 
 def test_approve_command_routes_to_workflow_manager() -> None:
     hub = DummyHub()
     handlers = CommandHandlers(hub)
 
-    result = handlers.handle("/approve approval-1 ship it", {"user_id": 99})
+    result = handlers.handle("/approve approval ship it", {"user_id": 99})
 
     assert result.startswith("Approval recorded")
     assert "Applied change set" in result

@@ -14,11 +14,16 @@ from agentic_hub.core.artifact_store import ArtifactStore
 from agentic_hub.core.repo_tools import RepoTools
 from agentic_hub.core.web_research import WebResearchClient
 from agentic_hub.core.worker_adapter import WorkerAdapter
+from agentic_hub.models.loadout import Loadout
+from agentic_hub.models.memory_policy import MemoryPolicy
 from agentic_hub.models.approval import ApprovalRequest
 from agentic_hub.models.artifact import Artifact
 from agentic_hub.models.task import Task
 from agentic_hub.models.task_result import TaskResult
+from agentic_hub.models.tool_definition import ToolDefinition
 from agentic_hub.models.worker_instance import WorkerInstance
+from agentic_hub.models.worker_role import WorkerRole
+from agentic_hub.models.worker_type import WorkerType
 
 
 class LiveAgentWorkerAdapter(WorkerAdapter):
@@ -101,7 +106,18 @@ class LiveAgentWorkerAdapter(WorkerAdapter):
         objective = str(task.payload["objective"])
         target_worker_id = str(task.payload["target_worker_id"])
 
-        change_set = self._generate_change_set(worker, objective, target_worker_id, research_artifact.content)
+        try:
+            change_set = self._normalize_change_set(
+                self._generate_change_set(worker, objective, target_worker_id, research_artifact.content)
+            )
+        except Exception as exc:
+            return TaskResult(
+                task_id=task.task_id,
+                worker_id=worker.worker_id,
+                status="failed",
+                summary="Implementation plan was invalid and was rejected before approval.",
+                error=str(exc),
+            )
         change_artifact = Artifact(
             artifact_id=str(uuid4()),
             task_id=task.task_id,
@@ -264,6 +280,12 @@ class LiveAgentWorkerAdapter(WorkerAdapter):
             "target_worker_id": target_worker_id,
             "research_brief": research_brief,
             "file_context": file_context,
+            "schema_guidance": {
+                "worker_files": "Only worker instance fields belong in workers/*.json. Do not put prompt_refs, skill_refs, soul_ref, or allowed_tool_ids there.",
+                "loadout_files": "Persona refs belong in loadouts/*.json using prompt_refs, soul_ref, skill_refs, and allowed_tool_ids.",
+                "role_files": "High-level purpose belongs in worker_roles/*.json.",
+                "verification": "Do not assume jq, bash, or python3. This is Windows PowerShell. Prefer repository-safe checks.",
+            },
             "required_output": {
                 "summary": "short summary",
                 "file_operations": [
@@ -290,6 +312,86 @@ class LiveAgentWorkerAdapter(WorkerAdapter):
             return change_set.get("summary", "No file operations proposed.")
         parts = [f"{item.get('action', 'update')} {item.get('path', '?')}" for item in operations]
         return "; ".join(parts[:8])
+
+    def _normalize_change_set(self, change_set: dict[str, Any]) -> dict[str, Any]:
+        normalized = {
+            "summary": str(change_set.get("summary", "")).strip(),
+            "file_operations": [],
+            "verification_commands": [],
+            "risks": [str(item) for item in change_set.get("risks", [])],
+        }
+        if not normalized["summary"]:
+            raise ValueError("Change set summary is required.")
+
+        operations = change_set.get("file_operations", [])
+        if not isinstance(operations, list) or not operations:
+            raise ValueError("Change set must include at least one file operation.")
+
+        for raw_operation in operations:
+            path = str(raw_operation.get("path", "")).replace("\\", "/").strip()
+            action = str(raw_operation.get("action", "")).strip().lower()
+            reason = str(raw_operation.get("reason", "")).strip()
+            if not path:
+                raise ValueError("Each file operation requires a path.")
+            if action not in {"create", "update", "delete"}:
+                raise ValueError(f"Unsupported file operation action: {action}")
+            operation: dict[str, Any] = {"path": path, "action": action, "reason": reason}
+            if action != "delete":
+                content = str(raw_operation.get("content", ""))
+                if not content:
+                    raise ValueError(f"File operation for {path} requires content.")
+                self._validate_structured_file(path, content)
+                operation["content"] = content
+            normalized["file_operations"].append(operation)
+
+        normalized["verification_commands"] = self._build_verification_commands(normalized["file_operations"])
+        return normalized
+
+    def _validate_structured_file(self, path: str, content: str) -> None:
+        model_cls = self._model_for_path(path)
+        if model_cls is None:
+            return
+        try:
+            payload = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{path} must contain valid JSON: {exc}") from exc
+        if not isinstance(payload, dict):
+            raise ValueError(f"{path} must contain a JSON object.")
+        unexpected = sorted(set(payload) - set(model_cls.model_fields))
+        if unexpected:
+            raise ValueError(f"{path} contains unsupported fields: {', '.join(unexpected)}")
+        model_cls.model_validate(payload)
+
+    def _model_for_path(self, path: str) -> type | None:
+        normalized = path.replace("\\", "/")
+        mapping = {
+            "/workers/": WorkerInstance,
+            "/loadouts/": Loadout,
+            "/worker_roles/": WorkerRole,
+            "/worker_types/": WorkerType,
+            "/tools/": ToolDefinition,
+            "/memory_policies/": MemoryPolicy,
+        }
+        for fragment, model_cls in mapping.items():
+            if fragment in normalized and normalized.endswith(".json"):
+                return model_cls
+        return None
+
+    def _build_verification_commands(self, file_operations: list[dict[str, Any]]) -> list[str]:
+        commands: list[str] = []
+        for operation in file_operations:
+            path = str(operation["path"]).replace("\\", "/")
+            if operation["action"] == "delete":
+                commands.append(f"if (Test-Path '{path}') {{ throw 'Expected deleted file still exists: {path}' }}")
+                continue
+            commands.append(f"if (-not (Test-Path '{path}')) {{ throw 'Expected file missing: {path}' }}")
+            if path.endswith(".json"):
+                commands.append(f"Get-Content '{path}' | ConvertFrom-Json | Out-Null")
+            elif path.endswith(".py"):
+                commands.append(f"python -m py_compile '{path}'")
+            elif path.endswith(".md"):
+                commands.append(f"Get-Content '{path}' | Out-Null")
+        return commands
 
     def _worker_system_prompt(self, worker: WorkerInstance, instruction: str) -> str:
         role = self.worker_registry.get_role(worker.role_id)

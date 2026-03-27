@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
 from typing import Any
 
 import requests
 
 from agentic_hub.catalog.worker_registry import WorkerRegistry
+from agentic_hub.core.runtime_config import PROJECT_ROOT
+from agentic_hub.models.loadout import Loadout
 from agentic_hub.models.telegram_conversation import TelegramConversationMessage
 from agentic_hub.models.worker_instance import WorkerInstance
 
@@ -29,19 +33,27 @@ class OpenAIConversationAgent:
         role = self.worker_registry.get_role(worker.role_id)
         loadout = self.worker_registry.get_loadout(worker.loadout_id)
         model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+        supplemental_context = self._build_loadout_context(loadout)
+
+        system_prompt_parts = [
+            f"You are {worker.name}.",
+            f"Worker id: {worker.worker_id}",
+            f"Role: {role.name}",
+            f"Purpose: {role.purpose}",
+            f"Interface mode: {worker.interface_mode}",
+            f"Channel type: {channel_type}",
+            f"Loadout: {loadout.name}",
+            "Address humans only.",
+            "Ignore and do not engage other bots.",
+            "Be concise, helpful, and natural in Telegram.",
+        ]
+        if supplemental_context:
+            system_prompt_parts.append("Supplemental worker context:")
+            system_prompt_parts.extend(supplemental_context)
 
         system_prompt = "\n".join(
             [
-                f"You are {worker.name}.",
-                f"Worker id: {worker.worker_id}",
-                f"Role: {role.name}",
-                f"Purpose: {role.purpose}",
-                f"Interface mode: {worker.interface_mode}",
-                f"Channel type: {channel_type}",
-                f"Loadout: {loadout.name}",
-                "Address humans only.",
-                "Ignore and do not engage other bots.",
-                "Be concise, helpful, and natural in Telegram.",
+                *system_prompt_parts,
             ]
         )
 
@@ -74,3 +86,36 @@ class OpenAIConversationAgent:
                     parts.append(text)
             return "\n".join(parts).strip()
         return str(message).strip()
+
+    def _build_loadout_context(self, loadout: Loadout) -> list[str]:
+        parts: list[str] = []
+        if loadout.soul_ref:
+            soul_text = self._read_ref(loadout.soul_ref)
+            if soul_text:
+                parts.append(f"Soul:\n{soul_text}")
+        for ref in loadout.prompt_refs:
+            prompt_text = self._read_ref(ref)
+            if prompt_text:
+                parts.append(f"Prompt ref {ref}:\n{prompt_text}")
+        for ref in loadout.skill_refs:
+            skill_text = self._read_ref(ref)
+            if skill_text:
+                parts.append(f"Skill ref {ref}:\n{skill_text}")
+        return parts
+
+    def _read_ref(self, ref: str) -> str:
+        path = (PROJECT_ROOT / ref).resolve() if not Path(ref).is_absolute() else Path(ref).resolve()
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except Exception:
+            return ""
+        if path.suffix.lower() == ".json":
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError:
+                return raw[:4000]
+            if isinstance(payload, dict):
+                if "content" in payload:
+                    return str(payload["content"])[:4000]
+                return json.dumps(payload, indent=2)[:4000]
+        return raw[:4000]

@@ -1,9 +1,9 @@
-﻿{
+{
     "worker_id":  "aria",
     "name":  "Aria",
     "type_id":  "agent_worker",
-    "role_id":  "operator",
-    "loadout_id":  "operator_core",
+    "role_id":  "band_assistant",
+    "loadout_id":  "aria_band_core",
     "interface_mode":  "hybrid",
     "assigned_queues":  [
                             "default"
@@ -13,7 +13,8 @@
     "enabled":  true,
     "tags":  [
                  "seed",
-                 "operator"
+                 "music",
+                 "band"
              ],
     "source":  "seed"
 }

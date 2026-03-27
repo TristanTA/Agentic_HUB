@@ -474,9 +474,12 @@ class CommandHandlers:
     def _approval_response(self, command: str, payload: dict[str, Any]) -> str:
         parts = command.split(maxsplit=2)
         if len(parts) < 2:
-            return self._render("Approval command", ["Usage: /approve <approval_id> [note] or /reject <approval_id> [note]"], ["/workflows"])
+            return self._render("Approval command", ["Usage: /approve <approval> [note] or /reject <approval> [note]"], ["/workflows"])
 
-        approval_id = parts[1]
+        try:
+            approval_id = self._resolve_approval_id(parts[1])
+        except Exception as exc:
+            return self._render("Approval command failed", [str(exc)], ["/workflows"])
         note = parts[2] if len(parts) > 2 else None
         approver_id = str(payload.get("user_id", "local"))
         action = parts[0].lower()
@@ -484,7 +487,7 @@ class CommandHandlers:
             if action == "/approve":
                 self.hub.approval_manager.approve(approval_id, approver_id=approver_id, note=note)
                 workflow_result = self.hub.live_workflow_manager.resume_approved_workflow(approval_id)
-                return self._render("Approval recorded", [workflow_result["message"]], ["/workflows", "/workflow <id>"])
+                return self._render("Approval recorded", [workflow_result["message"]], ["/workflows", "/workflow <workflow>"])
             self.hub.approval_manager.reject(approval_id, approver_id=approver_id, note=note)
             workflow_result = self.hub.live_workflow_manager.reject_workflow(approval_id, note=note)
             return self._render("Rejection recorded", [workflow_result["message"]], ["/workflows"])
@@ -506,50 +509,54 @@ class CommandHandlers:
             return self._render("Improve worker failed", [str(exc)], ["/workers", "/workflows"])
 
         body = [
-            f"Workflow: {workflow.workflow_id}",
+            f"Workflow: {self._display_id(workflow.workflow_id)}",
             f"Target worker: {workflow.target_worker_id}",
             f"Status: {workflow.status}",
         ]
         if workflow.approval_id:
-            body.append(f"Approval pending: {workflow.approval_id}")
-        return self._render("Worker improvement started", body, [f"/workflow {workflow.workflow_id}", "/workflows"])
+            body.append(f"Approval pending: {self._display_id(workflow.approval_id)}")
+        return self._render("Worker improvement started", body, [f"/workflow {self._short_id(workflow.workflow_id)}", "/workflows"])
 
     def _workflows(self) -> str:
         workflows = self.hub.live_workflow_manager.list_workflows()
         lines = [
-            f"- {workflow.workflow_id} | target={workflow.target_worker_id} | {workflow.status} | approval={workflow.approval_id or '-'}"
+            f"- {self._short_id(workflow.workflow_id)} | target={workflow.target_worker_id} | {workflow.status} | approval={self._short_id(workflow.approval_id) if workflow.approval_id else '-'}"
             for workflow in workflows
         ]
-        return self._render("Live workflows", lines or ["No live workflows recorded."], ["/improve-worker <worker_id> <objective>", "/workflow <id>"])
+        return self._render("Live workflows", lines or ["No live workflows recorded."], ["/improve-worker <worker_id> <objective>", "/workflow <workflow>"])
 
     def _workflow(self, command: str) -> str:
         parts = command.split(maxsplit=1)
         if len(parts) < 2:
-            return self._render("Workflow", ["Usage: /workflow <workflow_id>"], ["/workflows"])
+            return self._render("Workflow", ["Usage: /workflow <workflow>"], ["/workflows"])
         try:
-            data = self.hub.live_workflow_manager.inspect_workflow(parts[1])
+            workflow_id = self._resolve_workflow_id(parts[1])
+            data = self.hub.live_workflow_manager.inspect_workflow(workflow_id)
         except Exception as exc:
             return self._render("Workflow lookup failed", [str(exc)], ["/workflows"])
         body = [
-            f"Workflow: {data['workflow_id']}",
+            f"Workflow: {self._display_id(data['workflow_id'])}",
             f"Target worker: {data['target_worker_id']}",
             f"Status: {data['status']}",
             f"Objective: {data['objective']}",
-            f"Approval: {data['approval_id'] or '-'}",
+            f"Approval: {self._display_id(data['approval_id']) if data['approval_id'] else '-'}",
         ]
         if data.get("failure_reason"):
             body.append(f"Failure: {data['failure_reason']}")
         body.append("Tasks:")
         body.extend(
-            f"- {task['task_id']} | {task['kind']} | {task['status']} | {task['summary']}"
+            f"- {self._display_id(task['task_id'])} | {task['kind']} | {task['status']} | {task['summary']}"
             for task in data["tasks"]
         )
         body.append("Artifacts:")
         body.extend(
-            f"- {artifact['artifact_id']} | {artifact['kind']} | {artifact['title']}"
+            f"- {self._display_id(artifact['artifact_id'])} | {artifact['kind']} | {artifact['title']}"
             for artifact in data["artifacts"]
         )
-        return self._render("Workflow details", body, ["/workflows", "/approve <approval_id>", "/reject <approval_id>"])
+        next_actions = ["/workflows"]
+        if data["approval_id"]:
+            next_actions.extend([f"/approve {self._short_id(data['approval_id'])}", f"/reject {self._short_id(data['approval_id'])}"])
+        return self._render("Workflow details", body, next_actions)
 
     def _resolve_kind(self, raw: str) -> str | None:
         mapping = {"worker": "workers", "workers": "workers", "role": "worker_roles", "roles": "worker_roles", "worker_roles": "worker_roles", "type": "worker_types", "types": "worker_types", "worker_types": "worker_types", "tool": "tools", "tools": "tools", "loadout": "loadouts", "loadouts": "loadouts", "task": "tasks", "tasks": "tasks"}
@@ -674,6 +681,35 @@ class CommandHandlers:
     def _slugify(self, value: str) -> str:
         slug = value.strip().lower().replace(" ", "_")
         return "".join(ch for ch in slug if ch.isalnum() or ch == "_")
+
+    def _short_id(self, value: str | None) -> str:
+        if not value:
+            return "-"
+        return value[:5]
+
+    def _display_id(self, value: str | None) -> str:
+        if not value:
+            return "-"
+        if len(value) <= 8:
+            return value
+        return f"{self._short_id(value)} ({value})"
+
+    def _resolve_workflow_id(self, raw: str) -> str:
+        return self._resolve_unique_prefix(raw, [workflow.workflow_id for workflow in self.hub.live_workflow_manager.list_workflows()], "workflow")
+
+    def _resolve_approval_id(self, raw: str) -> str:
+        return self._resolve_unique_prefix(raw, [request.approval_id for request in self.hub.approval_manager.list_all()], "approval")
+
+    def _resolve_unique_prefix(self, raw: str, values: list[str], label: str) -> str:
+        token = raw.strip()
+        if token in values:
+            return token
+        matches = [value for value in values if value.startswith(token)]
+        if not matches:
+            raise KeyError(f"Unknown {label}: {token}")
+        if len(matches) > 1:
+            raise ValueError(f"Ambiguous {label}: {token}")
+        return matches[0]
 
     def _field_hint(self, field_name: str) -> str:
         return FIELD_HINTS.get(field_name, f"Enter {field_name}.")
