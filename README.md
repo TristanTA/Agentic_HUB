@@ -37,3 +37,13 @@ Each pack contains a `manifest.json` plus one JSON file per object inside folder
 - `memory_policies/`
 
 The shipped `basic` pack is the default baseline. Runtime edits are written to `data/runtime/catalog_overrides/` without mutating authored pack files.
+
+## Worker interaction modes
+
+Workers now declare an `interface_mode`:
+
+- `managed`: owns its own Telegram bot token and talks through its own bot identity
+- `internal`: only callable by runtime tasks, tools, or other workers
+- `hybrid`: internal for execution, but messageable through explicit Vanta slash commands
+
+Vanta remains the control bot. Managed worker bot registrations and Telegram conversation state are stored under `data/runtime/`.

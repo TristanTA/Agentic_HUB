@@ -7,3 +7,5 @@ from .worker_base import WorkerBase
 from .worker_instance import WorkerInstance
 from .memory_policy import MemoryPolicy
 from .memory_records import RunEpisode, SessionEpisode, SemanticFact
+from .telegram_managed_bot import TelegramManagedBot
+from .telegram_conversation import TelegramConversationMessage, TelegramConversationSession

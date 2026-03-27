@@ -4,6 +4,7 @@
     "type_id":  "agent_worker",
     "role_id":  "operator",
     "loadout_id":  "operator_core",
+    "interface_mode":  "hybrid",
     "assigned_queues":  [
                             "default"
                         ],

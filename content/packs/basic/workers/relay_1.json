@@ -4,6 +4,7 @@
     "type_id":  "tool_worker",
     "role_id":  "operator",
     "loadout_id":  "operator_core",
+    "interface_mode":  "internal",
     "assigned_queues":  [
                             "default"
                         ],

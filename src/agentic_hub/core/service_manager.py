@@ -42,6 +42,10 @@ class ServiceManager:
                 metadata=metadata or {},
             )
 
+    def unregister(self, name: str) -> None:
+        with self._lock:
+            self._services.pop(name, None)
+
     def start(self, name: str) -> dict[str, Any]:
         with self._lock:
             record = self._services[name]

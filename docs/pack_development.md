@@ -34,6 +34,7 @@ Required manifest fields:
 - Pack files are authored content.
 - Runtime changes belong in `data/runtime/catalog_overrides/`.
 - Packs can add workers, tools, loadouts, worker types, worker roles, and memory policies.
+- Worker definitions should explicitly set `interface_mode` to `managed`, `internal`, or `hybrid`.
 
 ## Import/export
 

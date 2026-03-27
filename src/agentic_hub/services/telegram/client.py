@@ -33,3 +33,8 @@ class TelegramClient:
         )
         r.raise_for_status()
         return r.json()
+
+    def get_me(self) -> dict:
+        r = requests.get(f"{self.base_url}/getMe", timeout=15)
+        r.raise_for_status()
+        return r.json()

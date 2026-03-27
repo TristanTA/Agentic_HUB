@@ -70,6 +70,8 @@ def test_basic_pack_uses_one_file_per_object() -> None:
     assert (basic_pack / "worker_roles" / "operator.json").exists()
     assert (basic_pack / "worker_types" / "agent_worker.json").exists()
     assert (basic_pack / "memory_policies" / "core_memory.json").exists()
+    aria = json.loads((basic_pack / "workers" / "aria.json").read_text(encoding="utf-8-sig"))
+    assert aria["interface_mode"] == "hybrid"
 
 
 def test_runtime_worker_persists_across_reload(tmp_path) -> None:

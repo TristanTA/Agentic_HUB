@@ -4,6 +4,7 @@
     "type_id":  "agent_worker",
     "role_id":  "coordinator",
     "loadout_id":  "coordinator_core",
+    "interface_mode":  "internal",
     "assigned_queues":  [
                             "default"
                         ],

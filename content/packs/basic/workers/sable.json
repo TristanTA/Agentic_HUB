@@ -4,6 +4,7 @@
     "type_id":  "approval_worker",
     "role_id":  "reviewer",
     "loadout_id":  "review_core",
+    "interface_mode":  "internal",
     "assigned_queues":  [
                             "default"
                         ],

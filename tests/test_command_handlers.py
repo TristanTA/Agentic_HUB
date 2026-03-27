@@ -11,6 +11,7 @@ from agentic_hub.core.service_manager import ServiceManager
 from agentic_hub.core.task_types import HubTask
 from agentic_hub.catalog.tool_registry import ToolRegistry
 from agentic_hub.catalog.worker_registry import WorkerRegistry
+from agentic_hub.models.telegram_conversation import TelegramConversationSession
 
 
 class DummyService:
@@ -44,6 +45,69 @@ class DummyHub:
             overrides_dir=self._runtime_dir / "catalog_overrides",
         )
         self.catalog_manager.reload_catalog()
+        self.telegram_runtime_manager = DummyTelegramManager()
+
+
+class DummyTelegramManager:
+    def __init__(self) -> None:
+        self.bots = []
+        self.sessions: dict[int, list[TelegramConversationSession]] = {}
+
+    def list_managed_bots(self):
+        return self.bots
+
+    def attach_managed_bot(self, worker_id: str, token: str):
+        record = type("Record", (), {"worker_id": worker_id, "bot_username": "aria_bot"})()
+        self.bots.append(record)
+        return record
+
+    def remove_managed_bot(self, worker_id: str) -> None:
+        self.bots = [bot for bot in self.bots if bot.worker_id != worker_id]
+
+    def start_managed_bot(self, worker_id: str) -> dict:
+        return {"message": f"{worker_id} started"}
+
+    def stop_managed_bot(self, worker_id: str) -> dict:
+        return {"message": f"{worker_id} stopped"}
+
+    def inspect_managed_bot(self, worker_id: str) -> dict:
+        return {"worker_id": worker_id, "bot_username": "aria_bot"}
+
+    def open_hybrid_session(self, worker_id: str, chat_id: int, user_id: int | None):
+        session = TelegramConversationSession(
+            session_id=f"{chat_id}:{worker_id}",
+            worker_id=worker_id,
+            channel_type="vanta_hybrid",
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+        self.sessions.setdefault(chat_id, [])
+        self.sessions[chat_id] = [item for item in self.sessions[chat_id] if item.worker_id != worker_id]
+        self.sessions[chat_id].append(session)
+        return session
+
+    def close_hybrid_session(self, chat_id: int, worker_id: str | None = None):
+        sessions = self.sessions.get(chat_id, [])
+        closed = []
+        for session in sessions:
+            if worker_id is None or session.worker_id == worker_id:
+                session.active = False
+                closed.append(session)
+        self.sessions[chat_id] = [session for session in sessions if session.active]
+        return closed
+
+    def list_hybrid_sessions(self, chat_id: int):
+        return self.sessions.get(chat_id, [])
+
+    def send_hybrid_message(self, *, chat_id: int, user_id: int | None, worker_id: str | None, text: str) -> str:
+        if worker_id:
+            self.open_hybrid_session(worker_id, chat_id, user_id)
+        sessions = self.sessions.get(chat_id, [])
+        if not sessions:
+            raise ValueError("No active hybrid session. Use /chat-open <worker_id> first.")
+        target = sessions[0] if worker_id is None else next(session for session in sessions if session.worker_id == worker_id)
+        target.messages.append(type("Msg", (), {"role": "user", "content": text})())
+        return f"reply from {target.worker_id}: {text}"
 
 
 def test_ping_command() -> None:
@@ -176,15 +240,17 @@ def test_new_worker_wizard_uses_plain_inputs() -> None:
     assert "Choose object type" in result
 
     result = handlers.handle("1", payload)
-    assert "Field 1 of 5: name" in result
+    assert "Field 1 of 6: name" in result
 
     result = handlers.handle("Test Worker", payload)
-    assert "Field 2 of 5: type_id" in result
+    assert "Field 2 of 6: type_id" in result
     assert "agent_worker" in result
 
     handlers.handle("agent_worker", payload)
     handlers.handle("operator", payload)
     handlers.handle("operator_core", payload)
+    result = handlers.handle("hybrid", payload)
+    assert "Field 6 of 6: enabled" in result
     result = handlers.handle("yes", payload)
     assert result.startswith("Preview changes")
     assert "enabled: True" in result
@@ -207,6 +273,7 @@ def test_edit_worker_wizard_uses_plain_inputs() -> None:
 
     result = handlers.handle("aria", payload)
     assert "Editable fields:" in result
+    assert "- interface_mode" in result
 
     result = handlers.handle("enabled", payload)
     assert "Answer yes or no." in result
@@ -217,5 +284,34 @@ def test_edit_worker_wizard_uses_plain_inputs() -> None:
 
     result = handlers.handle("confirm", payload)
     assert result.startswith("Updated worker")
+
+
+def test_telegram_attach_bot_command() -> None:
+    hub = DummyHub()
+    handlers = CommandHandlers(hub)
+
+    result = handlers.handle("/telegram attachbot aria token-123", {})
+
+    assert result.startswith("Managed bot attached")
+    assert "@aria_bot" in result
+
+
+def test_hybrid_chat_commands() -> None:
+    hub = DummyHub()
+    handlers = CommandHandlers(hub)
+    payload = {"source": "telegram", "chat_id": 10, "user_id": 20}
+
+    result = handlers.handle("/chat-open aria", payload)
+    assert result.startswith("Hybrid session opened")
+
+    result = handlers.handle("/chat hello there", payload)
+    assert result.startswith("Hybrid reply")
+    assert "reply from aria: hello there" in result
+
+    result = handlers.handle("/chat-sessions", payload)
+    assert "aria" in result
+
+    result = handlers.handle("/chat-close", payload)
+    assert result.startswith("Hybrid sessions closed")
 
 

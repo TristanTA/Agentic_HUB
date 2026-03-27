@@ -29,10 +29,14 @@ class FakeClient:
         self.commands_set = commands
         return {"ok": True}
 
+    def get_me(self) -> dict:
+        return {"ok": True, "result": {"username": "fake_worker_bot", "first_name": "Fake Worker"}}
+
 
 class FakeHub:
     def __init__(self) -> None:
         self.received_tasks = []
+        self.managed_messages = []
 
     def submit_and_run_task(self, task):
         self.received_tasks.append(task)
@@ -40,6 +44,10 @@ class FakeHub:
         if command == "/ping":
             return {"text": "hub alive"}
         return {"text": f"echo: {command}"}
+
+    def handle_managed_message(self, *, worker_id: str, text: str, payload: dict):
+        self.managed_messages.append((worker_id, text, payload))
+        return f"{worker_id}: {text}"
 
 
 def make_service(hub: FakeHub, client: FakeClient, allowed_user_ids=None) -> TelegramPollingService:
@@ -201,5 +209,112 @@ def test_status_reports_expected_fields() -> None:
     assert status["offset"] is None
     assert status["last_error"] is None
     assert status["allowed_user_ids"] == [123, 456]
+
+
+def test_managed_mode_private_chat_routes_directly_to_worker() -> None:
+    hub = FakeHub()
+    client = FakeClient()
+    service = TelegramPollingService(
+        hub=hub,
+        bot_token="fake-token",
+        allowed_user_ids={123},
+        poll_timeout=0,
+        idle_sleep=0,
+        mode="managed",
+        worker_id="aria",
+        bot_username="aria_bot",
+    )
+    service.client = client
+
+    service._handle_update(
+        {
+            "update_id": 300,
+            "message": {
+                "message_id": 12,
+                "text": "hello",
+                "chat": {"id": 555, "type": "private"},
+                "from": {"id": 123},
+            },
+        }
+    )
+
+    assert hub.managed_messages == [("aria", "hello", {"source": "telegram_managed", "chat_id": 555, "user_id": 123, "chat_type": "private"})]
+    assert client.sent_messages == [(555, "aria: hello")]
+
+
+def test_managed_mode_group_chat_requires_mention() -> None:
+    hub = FakeHub()
+    client = FakeClient()
+    service = TelegramPollingService(
+        hub=hub,
+        bot_token="fake-token",
+        allowed_user_ids={123},
+        poll_timeout=0,
+        idle_sleep=0,
+        mode="managed",
+        worker_id="aria",
+        bot_username="aria_bot",
+    )
+    service.client = client
+
+    service._handle_update(
+        {
+            "update_id": 301,
+            "message": {
+                "message_id": 13,
+                "text": "hello everyone",
+                "chat": {"id": 777, "type": "group"},
+                "from": {"id": 123},
+            },
+        }
+    )
+    assert hub.managed_messages == []
+    assert client.sent_messages == []
+
+    service._handle_update(
+        {
+            "update_id": 302,
+            "message": {
+                "message_id": 14,
+                "text": "@aria_bot hello group",
+                "chat": {"id": 777, "type": "group"},
+                "from": {"id": 123},
+            },
+        }
+    )
+
+    assert hub.managed_messages[-1][1] == "hello group"
+    assert client.sent_messages[-1] == (777, "aria: hello group")
+
+
+def test_managed_mode_ignores_bot_authors() -> None:
+    hub = FakeHub()
+    client = FakeClient()
+    service = TelegramPollingService(
+        hub=hub,
+        bot_token="fake-token",
+        allowed_user_ids={123},
+        poll_timeout=0,
+        idle_sleep=0,
+        mode="managed",
+        worker_id="aria",
+        bot_username="aria_bot",
+    )
+    service.client = client
+
+    service._handle_update(
+        {
+            "update_id": 303,
+            "message": {
+                "message_id": 15,
+                "text": "hello",
+                "chat": {"id": 888, "type": "private"},
+                "from": {"id": 123, "is_bot": True},
+            },
+        }
+    )
+
+    assert hub.managed_messages == []
+    assert client.sent_messages == []
 
 

@@ -62,6 +62,16 @@ class CommandHandlers:
             return self._services()
         if normalized == "/runtime":
             return self._runtime()
+        if normalized == "/telegram":
+            return self._telegram(command)
+        if normalized == "/chat-open":
+            return self._chat_open(command, payload)
+        if normalized == "/chat-close":
+            return self._chat_close(command, payload)
+        if normalized == "/chat":
+            return self._chat(command, payload)
+        if normalized == "/chat-sessions":
+            return self._chat_sessions(payload)
         if normalized == "/catalog":
             return self._catalog(command)
         return self._render(f"Unknown command: {normalized or command}", ["Command not recognized."], ["/help", "/status", "/inspect"])
@@ -186,6 +196,7 @@ class CommandHandlers:
                 "/workers, /tasks, /status, /inspect, /logs",
                 "/tools, /loadouts, /roles, /types",
                 "/pause, /resume, /retry",
+                "/telegram, /chat-open, /chat, /chat-close, /chat-sessions",
                 "Common objects: workers, worker_roles, worker_types, tools, loadouts, tasks",
                 "Example flow: /new -> worker -> answer prompts -> confirm",
             ],
@@ -334,6 +345,123 @@ class CommandHandlers:
             return self._render("Catalog command failed", [str(exc)], ["/help", "/logs"])
         return self._render("Catalog command", ["Unknown catalog subcommand."], ["/help", "/catalog"])
 
+    def _telegram(self, command: str) -> str:
+        parts = command.split(maxsplit=3)
+        manager = getattr(self.hub, "telegram_runtime_manager", None)
+        if manager is None:
+            return self._render("Telegram manager unavailable", [], ["/help"])
+        try:
+            if len(parts) == 1:
+                return self._render(
+                    "Telegram commands",
+                    [
+                        "/telegram bots",
+                        "/telegram attachbot <worker_id> <token>",
+                        "/telegram removebot <worker_id>",
+                        "/telegram startbot <worker_id>",
+                        "/telegram stopbot <worker_id>",
+                        "/telegram inspectbot <worker_id>",
+                    ],
+                    ["/workers", "/services"],
+                )
+            if parts[1] == "bots":
+                bots = manager.list_managed_bots()
+                lines = [f"- {bot.worker_id} | @{bot.bot_username} | {'enabled' if bot.enabled else 'disabled'}" for bot in bots]
+                return self._render("Managed Telegram bots", lines or ["No managed bots registered."], ["/telegram"])
+            if parts[1] == "attachbot":
+                worker_id, token = parts[2], parts[3]
+                record = manager.attach_managed_bot(worker_id, token)
+                return self._render(
+                    "Managed bot attached",
+                    [f"Worker: {worker_id}", f"Bot: @{record.bot_username}", "Bot runtime started."],
+                    [f"/telegram inspectbot {worker_id}", "/services"],
+                )
+            if parts[1] == "removebot":
+                manager.remove_managed_bot(parts[2])
+                return self._render("Managed bot removed", [f"Worker: {parts[2]}"], ["/telegram bots", "/workers"])
+            if parts[1] == "startbot":
+                result = manager.start_managed_bot(parts[2])
+                return self._render("Managed bot start", [str(result.get("message", result))], ["/services", f"/telegram inspectbot {parts[2]}"])
+            if parts[1] == "stopbot":
+                result = manager.stop_managed_bot(parts[2])
+                return self._render("Managed bot stop", [str(result.get("message", result))], ["/services", f"/telegram inspectbot {parts[2]}"])
+            if parts[1] == "inspectbot":
+                data = manager.inspect_managed_bot(parts[2])
+                body = [f"{key}: {value}" for key, value in data.items()]
+                return self._render("Managed bot", body, ["/telegram bots", "/services"])
+        except Exception as exc:
+            return self._render("Telegram command failed", [str(exc)], ["/telegram", "/help"])
+        return self._render("Telegram command", ["Unknown telegram subcommand."], ["/telegram", "/help"])
+
+    def _chat_open(self, command: str, payload: dict[str, Any]) -> str:
+        parts = command.split(maxsplit=1)
+        if len(parts) < 2:
+            return self._render("Hybrid chat", ["Usage: /chat-open <worker_id>"], ["/workers", "/help"])
+        manager = getattr(self.hub, "telegram_runtime_manager", None)
+        if manager is None:
+            return self._render("Hybrid chat unavailable", [], ["/help"])
+        try:
+            session = manager.open_hybrid_session(parts[1], int(payload.get("chat_id", 0)), payload.get("user_id"))
+        except Exception as exc:
+            return self._render("Hybrid chat failed", [str(exc)], ["/workers", "/help"])
+        return self._render(
+            "Hybrid session opened",
+            [f"Worker: {session.worker_id}", "Use /chat <message> to continue."],
+            ["/chat <message>", "/chat-close", "/chat-sessions"],
+        )
+
+    def _chat_close(self, command: str, payload: dict[str, Any]) -> str:
+        parts = command.split(maxsplit=1)
+        worker_id = parts[1] if len(parts) > 1 else None
+        manager = getattr(self.hub, "telegram_runtime_manager", None)
+        if manager is None:
+            return self._render("Hybrid chat unavailable", [], ["/help"])
+        closed = manager.close_hybrid_session(int(payload.get("chat_id", 0)), worker_id)
+        return self._render(
+            "Hybrid sessions closed",
+            [f"- {session.worker_id}" for session in closed] or ["No matching active sessions."],
+            ["/chat-sessions", "/workers"],
+        )
+
+    def _chat_sessions(self, payload: dict[str, Any]) -> str:
+        manager = getattr(self.hub, "telegram_runtime_manager", None)
+        if manager is None:
+            return self._render("Hybrid chat unavailable", [], ["/help"])
+        sessions = manager.list_hybrid_sessions(int(payload.get("chat_id", 0)))
+        lines = [f"- {session.worker_id} | active={session.active} | messages={len(session.messages)}" for session in sessions]
+        return self._render("Hybrid sessions", lines or ["No active hybrid sessions."], ["/chat-open <worker_id>", "/workers"])
+
+    def _chat(self, command: str, payload: dict[str, Any]) -> str:
+        manager = getattr(self.hub, "telegram_runtime_manager", None)
+        if manager is None:
+            return self._render("Hybrid chat unavailable", [], ["/help"])
+        try:
+            remainder = command.split(maxsplit=1)[1]
+        except IndexError:
+            return self._render("Hybrid chat", ["Usage: /chat <worker_id> <message> or /chat <message> with an active session"], ["/chat-open <worker_id>", "/chat-sessions"])
+
+        worker_id: str | None = None
+        message = remainder
+        parts = remainder.split(maxsplit=1)
+        if len(parts) == 2:
+            try:
+                self.hub.worker_registry.get_worker(parts[0])
+                worker_id = parts[0]
+                message = parts[1]
+            except Exception:
+                worker_id = None
+
+        try:
+            reply = manager.send_hybrid_message(
+                chat_id=int(payload.get("chat_id", 0)),
+                user_id=payload.get("user_id"),
+                worker_id=worker_id,
+                text=message,
+            )
+        except Exception as exc:
+            return self._render("Hybrid chat failed", [str(exc)], ["/chat-open <worker_id>", "/chat-sessions"])
+        return self._render("Hybrid reply", [reply], ["/chat <message>", "/chat-close", "/chat-sessions"])
+
     def _resolve_kind(self, raw: str) -> str | None:
         mapping = {"worker": "workers", "workers": "workers", "role": "worker_roles", "roles": "worker_roles", "worker_roles": "worker_roles", "type": "worker_types", "types": "worker_types", "worker_types": "worker_types", "tool": "tools", "tools": "tools", "loadout": "loadouts", "loadouts": "loadouts", "task": "tasks", "tasks": "tasks"}
         value = raw.strip().lower()
@@ -359,7 +487,11 @@ class CommandHandlers:
             identifier = self._catalog_identifier(kind, item)
             name = getattr(item, "name", identifier)
             status = ("enabled" if getattr(item, "enabled", False) else "disabled") if kind in {"workers", "tools"} else getattr(item, "status", "active")
-            refs = f"{item.type_id}/{item.role_id}" if kind == "workers" else (f"tools={len(item.allowed_tool_ids)}" if kind == "loadouts" else getattr(item, "purpose", getattr(item, "execution_mode", getattr(item, "safety_level", "-"))))
+            refs = (
+                f"{item.type_id}/{item.role_id}/{getattr(item, 'interface_mode', 'internal')}"
+                if kind == "workers"
+                else (f"tools={len(item.allowed_tool_ids)}" if kind == "loadouts" else getattr(item, "purpose", getattr(item, "execution_mode", getattr(item, "safety_level", "-"))))
+            )
             rows.append(f"[{idx}] {name} | {identifier} | {status} | {refs}")
         return rows
 

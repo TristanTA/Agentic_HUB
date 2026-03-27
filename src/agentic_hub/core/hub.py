@@ -7,7 +7,7 @@ from agentic_hub.core.approval_manager import ApprovalManager
 from agentic_hub.core.artifact_store import ArtifactStore
 from agentic_hub.catalog.catalog_manager import CatalogManager
 from agentic_hub.core.runtime_config import DEAD_TASKS_FILE, HEARTBEAT_SECONDS, STATE_FILE, TASKS_FILE
-from agentic_hub.core.runtime_config import CATALOG_RUNTIME_DIR, CATALOG_SEED_DIR
+from agentic_hub.core.runtime_config import CATALOG_RUNTIME_DIR, CATALOG_SEED_DIR, ENV_FILE, RUNTIME_DIR
 from agentic_hub.core.dead_task_store import DeadTaskStore
 from agentic_hub.core.event_log import EventLog
 from agentic_hub.core.executor import Executor
@@ -17,6 +17,7 @@ from agentic_hub.core.memory_manager import MemoryManager
 from agentic_hub.core.runtime_coordinator import RuntimeCoordinator
 from agentic_hub.core.hub_state import HubState
 from agentic_hub.core.task_store import TaskStore
+from agentic_hub.core.telegram_runtime_manager import TelegramRuntimeManager
 from agentic_hub.core.legacy_tasks import DeadTaskRecord, Task, TaskResult, utc_now
 from agentic_hub.core.service_manager import ServiceManager
 from agentic_hub.core.command_handlers import CommandHandlers
@@ -45,6 +46,13 @@ class Hub:
             overrides_dir=CATALOG_RUNTIME_DIR,
         )
         self.catalog_manager.reload_catalog()
+        self.telegram_runtime_manager = TelegramRuntimeManager(
+            hub=self,
+            worker_registry=self.worker_registry,
+            service_manager=self.service_manager,
+            runtime_dir=RUNTIME_DIR,
+            env_path=ENV_FILE,
+        )
         self.runtime_coordinator = RuntimeCoordinator(
             self.worker_registry,
             self.tool_registry,
@@ -66,6 +74,7 @@ class Hub:
         )
 
         self._register_services()
+        self.telegram_runtime_manager.register_persisted_managed_bots()
 
         self.executor = Executor(
             handlers={
@@ -115,7 +124,7 @@ class Hub:
         self.service_manager.register(
             "telegram",
             telegram,
-            metadata={"transport": "telegram"},
+            metadata={"transport": "telegram", "mode": "control"},
         )
         self.logger.info("Registered service: telegram")
 
@@ -248,6 +257,14 @@ class Hub:
         command = task.payload["command"]
         text = self.command_handlers.handle(command, task.payload)
         return {"text": text}
+
+    def handle_managed_message(self, *, worker_id: str, text: str, payload: dict) -> str:
+        return self.telegram_runtime_manager.handle_managed_message(
+            worker_id=worker_id,
+            chat_id=int(payload["chat_id"]),
+            user_id=payload.get("user_id"),
+            text=text,
+        )
 
     def request_stop(self):
         self.state.stop_requested = True

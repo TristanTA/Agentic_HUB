@@ -13,7 +13,7 @@ KIND_LABELS = {
 }
 
 EDITABLE_FIELDS = {
-    "workers": ["name", "type_id", "role_id", "loadout_id", "enabled", "priority_bias", "owner", "notes"],
+    "workers": ["name", "type_id", "role_id", "loadout_id", "interface_mode", "enabled", "priority_bias", "owner", "notes"],
     "worker_roles": ["name", "purpose", "behavior_guide_ref", "default_output_style"],
     "worker_types": ["name", "execution_mode", "can_use_tools", "can_spawn_tasks", "can_request_approval", "allowed_task_kinds"],
     "tools": ["name", "description", "implementation_ref", "enabled", "safety_level", "capability_tags"],
@@ -22,7 +22,7 @@ EDITABLE_FIELDS = {
 }
 
 CREATE_FIELDS = {
-    "workers": ["name", "type_id", "role_id", "loadout_id", "enabled"],
+    "workers": ["name", "type_id", "role_id", "loadout_id", "interface_mode", "enabled"],
     "worker_roles": ["name", "purpose", "behavior_guide_ref", "default_output_style"],
     "worker_types": ["name", "execution_mode", "can_use_tools", "can_spawn_tasks", "can_request_approval", "allowed_task_kinds"],
     "tools": ["name", "description", "implementation_ref", "safety_level", "enabled", "capability_tags"],
@@ -44,6 +44,7 @@ FIELD_HINTS = {
     "tool_policy_overrides": "Enter JSON object of tool policy overrides.",
     "payload": "Enter JSON object.",
     "tags": "Enter JSON list of tags.",
+    "interface_mode": "Choose how this worker can be reached: managed, internal, or hybrid.",
 }
 
 CHOICE_SOURCES = {
@@ -54,4 +55,5 @@ CHOICE_SOURCES = {
     "safety_level": ["low", "medium", "high"],
     "execution_mode": ["llm", "deterministic", "approval"],
     "trigger": ["startup", "interval", "once", "manual"],
+    "interface_mode": ["managed", "internal", "hybrid"],
 }

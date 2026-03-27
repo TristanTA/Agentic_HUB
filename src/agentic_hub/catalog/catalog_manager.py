@@ -275,6 +275,8 @@ class CatalogManager:
                 raise ValueError(f"Unknown worker role for worker {worker.worker_id}: {worker.role_id}")
             if worker.loadout_id not in loadout_ids:
                 raise ValueError(f"Unknown loadout for worker {worker.worker_id}: {worker.loadout_id}")
+            if worker.interface_mode not in {"managed", "internal", "hybrid"}:
+                raise ValueError(f"Unknown interface mode for worker {worker.worker_id}: {worker.interface_mode}")
 
     def _load_enabled_packs(self) -> dict[str, list[BaseModel]]:
         merged: dict[str, dict[str, BaseModel]] = {kind: {} for kind in self.FILES}

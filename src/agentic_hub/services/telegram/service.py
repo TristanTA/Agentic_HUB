@@ -27,6 +27,10 @@ class TelegramPollingService:
         {"command": "pause", "description": "Pause a worker or the hub"},
         {"command": "resume", "description": "Resume a worker or the hub"},
         {"command": "retry", "description": "Retry failed work"},
+        {"command": "telegram", "description": "Manage worker Telegram bots"},
+        {"command": "chat_open", "description": "Open a hybrid worker chat session"},
+        {"command": "chat", "description": "Send a message to a hybrid worker"},
+        {"command": "chat_close", "description": "Close hybrid worker chat sessions"},
     ]
 
     def __init__(
@@ -36,12 +40,18 @@ class TelegramPollingService:
         allowed_user_ids: set[int] | None = None,
         poll_timeout: int = 20,
         idle_sleep: float = 1.0,
+        mode: str = "control",
+        worker_id: str | None = None,
+        bot_username: str | None = None,
     ) -> None:
         self.hub = hub
         self.client = TelegramClient(bot_token)
         self.allowed_user_ids = allowed_user_ids or set()
         self.poll_timeout = poll_timeout
         self.idle_sleep = idle_sleep
+        self.mode = mode
+        self.worker_id = worker_id
+        self.bot_username = bot_username.lower() if bot_username else None
 
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -73,6 +83,9 @@ class TelegramPollingService:
             "offset": self._offset,
             "last_error": self._last_error,
             "allowed_user_ids": sorted(self.allowed_user_ids),
+            "mode": self.mode,
+            "worker_id": self.worker_id,
+            "bot_username": self.bot_username,
         }
 
     def _run_loop(self) -> None:
@@ -103,15 +116,27 @@ class TelegramPollingService:
 
         from_user = message.get("from", {})
         user_id = from_user.get("id")
+        is_bot = bool(from_user.get("is_bot"))
         chat = message.get("chat", {})
         chat_id = chat.get("id")
+        chat_type = chat.get("type", "private")
         text = (message.get("text") or "").strip()
 
         if not text or chat_id is None or user_id is None:
             return
 
+        if is_bot:
+            return
+
         if self.allowed_user_ids and user_id not in self.allowed_user_ids:
             self.client.send_message(chat_id, "unauthorized")
+            return
+
+        if self.mode == "managed":
+            routed = self._route_managed_message(text=text, chat_type=chat_type, chat_id=chat_id, user_id=user_id)
+            if routed is None:
+                return
+            self.client.send_message(chat_id, routed)
             return
 
         task = HubTask(
@@ -138,5 +163,31 @@ class TelegramPollingService:
             response_text = f"error: {exc}"
 
         self.client.send_message(chat_id, response_text)
+
+    def _route_managed_message(self, *, text: str, chat_type: str, chat_id: int, user_id: int) -> str | None:
+        if self.worker_id is None:
+            return "managed worker is not configured"
+
+        routed_text = text
+        if chat_type in {"group", "supergroup"}:
+            if not self.bot_username:
+                return None
+            mention = f"@{self.bot_username}"
+            lowered = text.lower()
+            if mention not in lowered:
+                return None
+            start = lowered.index(mention)
+            end = start + len(mention)
+            routed_text = (text[:start] + text[end:]).strip()
+            if not routed_text:
+                return None
+        elif text in {"/start", "/help"}:
+            return f"{self.worker_id} is online. Message normally here, or mention this bot in groups."
+
+        return self.hub.handle_managed_message(
+            worker_id=self.worker_id,
+            text=routed_text,
+            payload={"source": "telegram_managed", "chat_id": chat_id, "user_id": user_id, "chat_type": chat_type},
+        )
 
 
