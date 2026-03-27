@@ -90,6 +90,17 @@ def test_plain_language_status_request_maps_to_admin_action(tmp_path) -> None:
     assert "Hub `" in result
 
 
+def test_plain_language_worker_status_request_maps_to_admin_action(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "What is the status of aria?",
+        {"source": "telegram", "chat_id": 1, "user_id": 2},
+    )
+
+    assert "Worker `aria`" in result
+
+
 def test_plain_language_overview_request_lists_workers_tasks_and_services(tmp_path) -> None:
     hub = build_hub(tmp_path)
 
@@ -206,3 +217,28 @@ def test_repo_capabilities_are_on_demand(tmp_path) -> None:
     capability_ids = {item.capability_id for item in manifest}
     assert "request_code_change" in capability_ids
     assert "repo_context" in capability_ids
+
+
+def test_grant_existing_tool_access_updates_worker_loadout(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "Give aria access to web_search",
+        {"source": "telegram", "chat_id": 8, "user_id": 9},
+    )
+
+    assert "Granted `aria` access to tool `web_search`" in result
+    loadout = hub.worker_registry.get_loadout(hub.worker_registry.get_worker("aria").loadout_id)
+    assert "web_search" in loadout.allowed_tool_ids
+
+
+def test_grant_unknown_model_access_requests_code_change_approval(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "Can we give aria the ability to access Google's nano-banana model?",
+        {"source": "telegram", "chat_id": 8, "user_id": 9},
+    )
+
+    assert "Approval required before changing executable code" in result
+    assert "google nano-banana" in result.lower()

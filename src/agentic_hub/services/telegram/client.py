@@ -25,6 +25,15 @@ class TelegramClient:
         r.raise_for_status()
         return r.json()
 
+    def send_chat_action(self, chat_id: int, action: str = "typing") -> dict:
+        r = requests.post(
+            f"{self.base_url}/sendChatAction",
+            json={"chat_id": chat_id, "action": action},
+            timeout=15,
+        )
+        r.raise_for_status()
+        return r.json()
+
     def set_my_commands(self, commands: list[dict[str, str]]) -> dict:
         r = requests.post(
             f"{self.base_url}/setMyCommands",

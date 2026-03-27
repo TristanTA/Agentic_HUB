@@ -119,6 +119,7 @@ class TelegramPollingService:
             return
 
         if self.mode == "managed":
+            self._send_typing(chat_id)
             routed = self._route_managed_message(text=text, chat_type=chat_type, chat_id=chat_id, user_id=user_id)
             if routed is None:
                 return
@@ -138,6 +139,7 @@ class TelegramPollingService:
         )
 
         try:
+            self._send_typing(chat_id)
             result = self.hub.submit_and_run_task(task)
             response_text = "ok"
             if isinstance(result, dict):
@@ -149,6 +151,12 @@ class TelegramPollingService:
             response_text = f"error: {exc}"
 
         self.client.send_message(chat_id, response_text)
+
+    def _send_typing(self, chat_id: int) -> None:
+        try:
+            self.client.send_chat_action(chat_id, "typing")
+        except Exception:
+            pass
 
     def _route_managed_message(self, *, text: str, chat_type: str, chat_id: int, user_id: int) -> str | None:
         if self.worker_id is None:

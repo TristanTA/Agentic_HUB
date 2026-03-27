@@ -10,6 +10,7 @@ class FakeClient:
         self.updates = updates or []
         self.fail_on_get = fail_on_get
         self.sent_messages: list[tuple[int, str]] = []
+        self.chat_actions: list[tuple[int, str]] = []
         self.commands_set: list[dict[str, str]] | None = None
         self.calls = 0
 
@@ -23,6 +24,10 @@ class FakeClient:
 
     def send_message(self, chat_id: int, text: str) -> dict:
         self.sent_messages.append((chat_id, text))
+        return {"ok": True}
+
+    def send_chat_action(self, chat_id: int, action: str = "typing") -> dict:
+        self.chat_actions.append((chat_id, action))
         return {"ok": True}
 
     def set_my_commands(self, commands: list[dict[str, str]]) -> dict:
@@ -85,6 +90,7 @@ def test_handle_update_authorized_user_creates_task_and_sends_response() -> None
     assert task.payload["command"] == "/ping"
     assert task.payload["chat_id"] == 999
     assert task.payload["user_id"] == 123
+    assert client.chat_actions == [(999, "typing")]
     assert client.sent_messages == [(999, "hub alive")]
 
 
@@ -240,6 +246,7 @@ def test_managed_mode_private_chat_routes_directly_to_worker() -> None:
     )
 
     assert hub.managed_messages == [("aria", "hello", {"source": "telegram_managed", "chat_id": 555, "user_id": 123, "chat_type": "private"})]
+    assert client.chat_actions == [(555, "typing")]
     assert client.sent_messages == [(555, "aria: hello")]
 
 

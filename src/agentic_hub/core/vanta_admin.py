@@ -100,6 +100,14 @@ class VantaAdminAgent:
             required_argument_names=["tool_id", "name", "description", "implementation_ref"],
         ),
         VantaCapability(
+            capability_id="grant_tool_access",
+            label="grant tool access",
+            summary="Grant an existing tool to a worker by updating its loadout.",
+            action_kind="grant_tool_access",
+            access="mutating",
+            required_argument_names=["worker_id", "tool_id"],
+        ),
+        VantaCapability(
             capability_id="attach_managed_bot",
             label="attach managed bot",
             summary="Attach a Telegram bot token to an existing managed worker.",
@@ -249,6 +257,9 @@ class VantaAdminAgent:
             return VantaPlan(actions=[AdminAction(kind="review_skills", params={}, summary="Generate skill review report")])
         if self._is_hub_status_request(lowered):
             return VantaPlan(actions=[AdminAction(kind="inspect_status", params={"target": "hub"}, summary="Inspect hub status")])
+        worker_status_target = self._status_target(text)
+        if worker_status_target:
+            return VantaPlan(actions=[AdminAction(kind="inspect_status", params={"target": worker_status_target}, summary=f"Inspect {worker_status_target}")])
         return None
 
     def _plan_request(self, text: str) -> VantaPlan:
@@ -326,6 +337,10 @@ class VantaAdminAgent:
         if self._is_create_tool_request(lowered):
             return self._plan_or_follow_up("create_tool", text)
 
+        tool_access_plan = self._plan_tool_access(text)
+        if tool_access_plan is not None:
+            return tool_access_plan
+
         if self._is_create_worker_request(lowered):
             return self._plan_or_follow_up("create_worker", text)
 
@@ -387,6 +402,14 @@ class VantaAdminAgent:
                         "safety_level": draft.get("safety_level", "low"),
                     },
                     summary=f"Create tool {draft['tool_id']}",
+                )
+            ]
+        if kind == "grant_tool_access":
+            return [
+                AdminAction(
+                    kind="grant_tool_access",
+                    params={"worker_id": draft["worker_id"], "tool_id": draft["tool_id"]},
+                    summary=f"Grant tool access for {draft['worker_id']}",
                 )
             ]
         raise ValueError(f"Unsupported pending action kind: {kind}")
@@ -462,20 +485,24 @@ class VantaAdminAgent:
                 draft["model_name"] = model_name
             return draft
 
-        if kind == "create_tool":
+        if kind in {"create_tool", "grant_tool_access"}:
             name = self._extract_name(text)
-            if name:
+            if name and kind == "create_tool":
                 draft["name"] = name
                 draft["tool_id"] = self._slugify(name)
+            worker_id = self._match_worker_id(text)
+            if worker_id:
+                draft["worker_id"] = worker_id
             tool_id = self._match_tool_id(text)
             if tool_id:
                 draft["tool_id"] = tool_id
-                if "name" not in draft:
+                if "name" not in draft and kind == "create_tool":
                     draft["name"] = tool_id.replace("_", " ").title()
             implementation_ref = self._extract_implementation_ref(text)
             if implementation_ref:
                 draft["implementation_ref"] = implementation_ref
-            draft["description"] = text.strip().rstrip(".")
+            if kind == "create_tool":
+                draft["description"] = text.strip().rstrip(".")
             safety_level = self._extract_safety_level(text)
             if safety_level:
                 draft["safety_level"] = safety_level
@@ -505,6 +532,12 @@ class VantaAdminAgent:
             if "implementation_ref" not in draft:
                 return "implementation_ref"
             return None
+        if kind == "grant_tool_access":
+            if "worker_id" not in draft:
+                return "worker_id"
+            if "tool_id" not in draft:
+                return "tool_id"
+            return None
         return None
 
     def _follow_up_question(self, kind: AdminActionKind, field_name: str, draft: dict[str, Any]) -> str:
@@ -518,6 +551,8 @@ class VantaAdminAgent:
             return "What model should this worker use?"
         if field_name == "worker_id":
             return "Which worker should I attach the managed Telegram bot to?"
+        if field_name == "tool_id":
+            return f"Which tool should I grant to `{draft.get('worker_id', 'that worker')}`?"
         if field_name == "implementation_ref":
             return f"What implementation reference should I use for `{draft.get('tool_id', 'that tool')}`?"
         return f"I need one more detail: {field_name}."
@@ -527,6 +562,8 @@ class VantaAdminAgent:
         if field_name == "name":
             return value
         if field_name == "worker_id":
+            return self._slugify(value)
+        if field_name == "tool_id":
             return self._slugify(value)
         if field_name == "implementation_ref":
             return value
@@ -608,6 +645,16 @@ class VantaAdminAgent:
 
     def _is_hub_status_request(self, lowered: str) -> bool:
         return any(phrase in lowered for phrase in {"hub status", "inspect hub", "show hub status"})
+
+    def _status_target(self, text: str) -> str | None:
+        lowered = text.lower().strip()
+        if "status" not in lowered and "inspect" not in lowered:
+            return None
+        if any(phrase in lowered for phrase in {"status of", "what is the status of", "what's the status of", "what is", "show status for"}):
+            worker_id = self._match_worker_id(text)
+            if worker_id:
+                return worker_id
+        return None
 
     def _is_create_worker_request(self, lowered: str) -> bool:
         return bool(CREATE_WORDS.intersection(lowered.split())) and any(word in lowered for word in {"worker", "agent", "telegram bot"})
@@ -709,6 +756,54 @@ class VantaAdminAgent:
             if tag in lowered:
                 tags.append(tag)
         return tags
+
+    def _plan_tool_access(self, text: str) -> VantaPlan | None:
+        lowered = text.lower()
+        if not any(phrase in lowered for phrase in {"give", "grant", "allow", "access to", "ability to access", "use "}):
+            return None
+        worker_id = self._match_worker_id(text)
+        if worker_id is None:
+            return None
+        tool = self._match_tool(text)
+        if tool is not None:
+            return VantaPlan(
+                actions=[
+                    AdminAction(
+                        kind="grant_tool_access",
+                        params={"worker_id": worker_id, "tool_id": tool.tool_id},
+                        summary=f"Grant {worker_id} access to {tool.tool_id}",
+                    )
+                ]
+            )
+        if any(word in lowered for word in {"model", "tool", "nano-banana", "nanobanana", "google"}):
+            requested_tool = self._extract_requested_tool_label(text)
+            summary = (
+                f"Draft a code change to add support for `{requested_tool}` and make it available to worker `{worker_id}`."
+            )
+            return VantaPlan(
+                actions=[
+                    AdminAction(
+                        kind="request_code_change",
+                        params={"request_summary": summary, "worker_id": worker_id, "original_request": text},
+                        summary=summary,
+                        requires_approval=True,
+                    )
+                ]
+            )
+        return None
+
+    def _match_tool(self, text: str):
+        lowered = text.lower()
+        for tool in self.hub.catalog_manager.list_objects("tools"):
+            if tool.tool_id.lower() in lowered or tool.name.lower() in lowered:
+                return tool
+        return None
+
+    def _extract_requested_tool_label(self, text: str) -> str:
+        lowered = text.lower()
+        if "nano-banana" in lowered or "nanobanana" in lowered:
+            return "google nano-banana"
+        return text.strip()
 
     def _slugify(self, value: str) -> str:
         slug = value.strip().lower().replace(" ", "_")

@@ -59,6 +59,7 @@ class AdminExecutor:
             "update_worker": self._update_worker,
             "create_loadout": self._create_loadout,
             "create_tool": self._create_tool,
+            "grant_tool_access": self._grant_tool_access,
             "attach_managed_bot": self._attach_managed_bot,
             "propose_skill": self._propose_skill,
             "approve_skill": self._approve_skill,
@@ -185,6 +186,27 @@ class AdminExecutor:
             summary=f"Created tool `{tool_id}`.",
             changed_ids=[tool_id],
             validation_results=[f"tool `{tool_id}` is available in the active registry"],
+        )
+
+    def _grant_tool_access(self, action: AdminAction) -> AdminActionResult:
+        worker_id = str(action.params["worker_id"])
+        tool_id = str(action.params["tool_id"])
+        worker = self.hub.worker_registry.get_worker(worker_id)
+        loadout = self.hub.worker_registry.get_loadout(worker.loadout_id)
+        allowed_tool_ids = list(loadout.allowed_tool_ids)
+        if tool_id not in allowed_tool_ids:
+            allowed_tool_ids.append(tool_id)
+        self.hub.catalog_manager.update("loadouts", loadout.loadout_id, {"allowed_tool_ids": allowed_tool_ids})
+        self.hub.worker_registry.get_loadout(loadout.loadout_id)
+        return AdminActionResult(
+            kind=action.kind,
+            status="completed",
+            summary=f"Granted `{worker_id}` access to tool `{tool_id}` through loadout `{loadout.loadout_id}`.",
+            changed_ids=[worker_id, loadout.loadout_id, tool_id],
+            validation_results=[
+                f"tool `{tool_id}` is allowed in loadout `{loadout.loadout_id}`",
+                f"worker `{worker_id}` can now use tool `{tool_id}`",
+            ],
         )
 
     def _attach_managed_bot(self, action: AdminAction) -> AdminActionResult:
