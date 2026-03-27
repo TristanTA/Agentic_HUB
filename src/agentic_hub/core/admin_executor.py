@@ -58,6 +58,7 @@ class AdminExecutor:
             "create_worker": self._create_worker,
             "update_worker": self._update_worker,
             "create_loadout": self._create_loadout,
+            "create_tool": self._create_tool,
             "attach_managed_bot": self._attach_managed_bot,
             "propose_skill": self._propose_skill,
             "approve_skill": self._approve_skill,
@@ -70,6 +71,7 @@ class AdminExecutor:
             "run_smoke_test": self._run_smoke_test,
             "inspect_status": self._inspect_status,
             "list_objects": self._list_objects,
+            "list_services": self._list_services,
         }
         return handlers[action.kind](action)
 
@@ -156,6 +158,33 @@ class AdminExecutor:
             summary=f"Created loadout `{loadout_id}`.",
             changed_ids=[loadout_id],
             validation_results=[f"loadout `{loadout_id}` is available in the active registry"],
+        )
+
+    def _create_tool(self, action: AdminAction) -> AdminActionResult:
+        params = dict(action.params)
+        tool_id = str(params["tool_id"])
+        self.hub.catalog_manager.upsert(
+            "tools",
+            {
+                "tool_id": tool_id,
+                "name": params["name"],
+                "description": params["description"],
+                "implementation_ref": params["implementation_ref"],
+                "capability_tags": list(params.get("capability_tags", [])),
+                "safety_level": params.get("safety_level", "low"),
+                "input_schema_ref": params.get("input_schema_ref"),
+                "output_schema_ref": params.get("output_schema_ref"),
+                "enabled": bool(params.get("enabled", True)),
+            },
+            source="runtime",
+        )
+        self.hub.tool_registry.get(tool_id)
+        return AdminActionResult(
+            kind=action.kind,
+            status="completed",
+            summary=f"Created tool `{tool_id}`.",
+            changed_ids=[tool_id],
+            validation_results=[f"tool `{tool_id}` is available in the active registry"],
         )
 
     def _attach_managed_bot(self, action: AdminAction) -> AdminActionResult:
@@ -313,6 +342,14 @@ class AdminExecutor:
                 elif kind == "worker_types":
                     rows.append(item.type_id)
         summary = "\n".join(rows[:20]) if rows else f"No {kind} found."
+        return AdminActionResult(kind=action.kind, status="completed", summary=summary)
+
+    def _list_services(self, action: AdminAction) -> AdminActionResult:
+        rows = []
+        for service_name in sorted(self.hub.service_manager._services):
+            status = self.hub.service_manager.status(service_name)
+            rows.append(f"{service_name} | {status['state']}")
+        summary = "\n".join(rows) if rows else "No services found."
         return AdminActionResult(kind=action.kind, status="completed", summary=summary)
 
     def _validate_worker_ready(self, worker_id: str) -> list[str]:

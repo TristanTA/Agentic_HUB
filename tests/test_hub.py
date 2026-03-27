@@ -4,6 +4,7 @@ from datetime import timedelta
 import agentic_hub.core.hub as hub_module
 from agentic_hub.core.hub import Hub
 from agentic_hub.core.legacy_tasks import Task, TaskResult, utc_now
+from agentic_hub.core.task_types import HubTask
 
 
 def test_get_next_task_returns_highest_priority_due_task(tmp_path, monkeypatch):
@@ -501,5 +502,41 @@ def test_invalid_telegram_allowed_user_ids_are_ignored(tmp_path, monkeypatch):
 
     telegram = hub.service_manager._services["telegram"].service
     assert telegram.allowed_user_ids == {123, 456}
+
+
+def test_submit_and_run_task_routes_slash_commands_to_command_handlers(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    task_file = tmp_path / "tasks.json"
+    dead_file = tmp_path / "dead_tasks.json"
+
+    monkeypatch.setattr(hub_module, "STATE_FILE", state_file)
+    monkeypatch.setattr(hub_module, "TASKS_FILE", task_file)
+    monkeypatch.setattr(hub_module, "DEAD_TASKS_FILE", dead_file)
+
+    hub = Hub(register_services=False)
+    monkeypatch.setattr(hub.command_handlers, "handle", lambda command, payload: "slash-path")
+    monkeypatch.setattr(hub.vanta_admin, "handle_message", lambda text, payload: "vanta-path")
+
+    result = hub.submit_and_run_task(HubTask(task_id="1", kind="telegram.command", payload={"command": "/workers"}))
+
+    assert result == {"text": "slash-path"}
+
+
+def test_submit_and_run_task_routes_plain_text_to_vanta(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    task_file = tmp_path / "tasks.json"
+    dead_file = tmp_path / "dead_tasks.json"
+
+    monkeypatch.setattr(hub_module, "STATE_FILE", state_file)
+    monkeypatch.setattr(hub_module, "TASKS_FILE", task_file)
+    monkeypatch.setattr(hub_module, "DEAD_TASKS_FILE", dead_file)
+
+    hub = Hub(register_services=False)
+    monkeypatch.setattr(hub.command_handlers, "handle", lambda command, payload: "slash-path")
+    monkeypatch.setattr(hub.vanta_admin, "handle_message", lambda text, payload: "vanta-path")
+
+    result = hub.submit_and_run_task(HubTask(task_id="2", kind="telegram.command", payload={"command": "list all workers"}))
+
+    assert result == {"text": "vanta-path"}
 
 

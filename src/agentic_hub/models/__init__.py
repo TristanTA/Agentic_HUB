@@ -13,3 +13,4 @@ from .skill_proposal import SkillProposal
 from .skill_review_report import SkillReviewItem, SkillReviewReport
 from .telegram_managed_bot import TelegramManagedBot
 from .telegram_conversation import TelegramConversationMessage, TelegramConversationSession
+from .vanta_capability import VantaCapability

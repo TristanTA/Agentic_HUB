@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from agentic_hub.core.hub import Hub
 
@@ -89,6 +90,48 @@ def test_plain_language_status_request_maps_to_admin_action(tmp_path) -> None:
     assert "Hub `" in result
 
 
+def test_plain_language_overview_request_lists_workers_tasks_and_services(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "Inspect current hub status, workers, tasks, and services.",
+        {"source": "telegram", "chat_id": 10, "user_id": 20},
+    )
+
+    assert "Hub `" in result
+    assert "aria" in result
+    assert "Startup Task" in result
+    assert "telegram" not in result or "No services found." in result or "|" in result
+
+
+def test_list_workers_follow_up_does_not_turn_into_create_worker(tmp_path, monkeypatch) -> None:
+    hub = build_hub(tmp_path)
+    monkeypatch.setattr(
+        hub.vanta_admin,
+        "_cheap_route",
+        lambda text: SimpleNamespace(
+            actions=[],
+            follow_up_question="Would you also like a list of all the active workers and their statuses?",
+            follow_up_field=None,
+            pending_action_kind=None,
+            reply=None,
+        ) if text.lower() == "what are the workers?" else None,
+    )
+
+    first = hub.vanta_admin.handle_message(
+        "what are the workers?",
+        {"source": "telegram", "chat_id": 1, "user_id": 2},
+    )
+    second = hub.vanta_admin.handle_message(
+        "yes",
+        {"source": "telegram", "chat_id": 1, "user_id": 2},
+    )
+
+    assert "Default capabilities:" in first
+    assert "What should I call the worker?" not in second
+    assert "Default capabilities:" in second
+
+
 def test_explicit_skill_request_requires_approval_before_attachment(tmp_path) -> None:
     hub = build_hub(tmp_path)
 
@@ -123,3 +166,43 @@ def test_repeated_requests_trigger_skill_proposal(tmp_path) -> None:
 
     assert "noted that repeated capability request" in first
     assert "Approve this skill?" in second
+
+
+def test_create_tool_in_runtime_overrides(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    question = hub.vanta_admin.handle_message(
+        "Create a new tool named Banana Logger",
+        {"source": "telegram", "chat_id": 3, "user_id": 4},
+    )
+    assert "What implementation reference" in question
+
+    result = hub.vanta_admin.handle_message(
+        "agentic_hub.tools.banana.logger",
+        {"source": "telegram", "chat_id": 3, "user_id": 4},
+    )
+
+    assert "Created tool `banana_logger`." in result
+    assert hub.tool_registry.get("banana_logger").implementation_ref == "agentic_hub.tools.banana.logger"
+
+
+def test_default_capability_manifest_stays_compact(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    manifest = hub.vanta_admin.default_capabilities()
+
+    capability_ids = {item.capability_id for item in manifest}
+    assert "create_worker" in capability_ids
+    assert "create_tool" in capability_ids
+    assert "request_code_change" not in capability_ids
+    assert all(item.escalation_pack == "default" for item in manifest)
+
+
+def test_repo_capabilities_are_on_demand(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    manifest = hub.vanta_admin.get_capability_manifest(["default", "repo"])
+
+    capability_ids = {item.capability_id for item in manifest}
+    assert "request_code_change" in capability_ids
+    assert "repo_context" in capability_ids

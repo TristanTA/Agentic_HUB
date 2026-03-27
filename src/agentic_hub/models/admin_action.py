@@ -9,6 +9,7 @@ AdminActionKind = Literal[
     "create_worker",
     "update_worker",
     "create_loadout",
+    "create_tool",
     "attach_managed_bot",
     "propose_skill",
     "approve_skill",
@@ -21,6 +22,7 @@ AdminActionKind = Literal[
     "run_smoke_test",
     "inspect_status",
     "list_objects",
+    "list_services",
     "request_code_change",
 ]
 
@@ -38,6 +40,7 @@ class AdminAction(BaseModel):
             "create_worker": {"worker_id", "name", "type_id", "role_id", "loadout_id", "interface_mode"},
             "update_worker": {"worker_id", "updates"},
             "create_loadout": {"loadout_id", "name"},
+            "create_tool": {"tool_id", "name", "description", "implementation_ref"},
             "attach_managed_bot": {"worker_id", "bot_token"},
             "propose_skill": {"request_text", "target_loadout_ids"},
             "approve_skill": {"skill_id"},
@@ -50,6 +53,7 @@ class AdminAction(BaseModel):
             "run_smoke_test": {"worker_id"},
             "inspect_status": {"target"},
             "list_objects": {"kind"},
+            "list_services": set(),
             "request_code_change": {"request_summary"},
         }
         missing = sorted(required_params[self.kind] - set(self.params))
@@ -78,4 +82,5 @@ class VantaPlan(BaseModel):
     actions: list[AdminAction] = Field(default_factory=list)
     follow_up_question: str | None = None
     follow_up_field: str | None = None
+    pending_action_kind: AdminActionKind | None = None
     reply: str | None = None
