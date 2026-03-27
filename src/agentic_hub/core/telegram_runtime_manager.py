@@ -38,7 +38,17 @@ class TelegramRuntimeManager:
         self.conversation_agent = OpenAIConversationAgent(worker_registry, skill_library=skill_library)
 
     def load_managed_bots(self) -> list[TelegramManagedBot]:
-        return self.managed_bot_store.load()
+        records = self.managed_bot_store.load()
+        fallback_users = sorted(self._control_allowed_user_ids())
+        updated = False
+        for record in records:
+            if not record.allowed_user_ids and not record.allowed_chat_ids and fallback_users:
+                record.allowed_user_ids = list(fallback_users)
+                record.updated_at = utc_now()
+                updated = True
+        if updated:
+            self.managed_bot_store.save(records)
+        return records
 
     def list_managed_bots(self) -> list[TelegramManagedBot]:
         return self.load_managed_bots()

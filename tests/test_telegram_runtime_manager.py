@@ -7,6 +7,7 @@ from agentic_hub.catalog.tool_registry import ToolRegistry
 from agentic_hub.catalog.worker_registry import WorkerRegistry
 from agentic_hub.core.service_manager import ServiceManager
 from agentic_hub.core.telegram_runtime_manager import TelegramRuntimeManager
+from agentic_hub.models.telegram_managed_bot import TelegramManagedBot
 
 
 class DummyHub:
@@ -112,6 +113,38 @@ def test_allow_managed_chat_persists_for_worker(tmp_path, monkeypatch) -> None:
 
     assert 777 in record.allowed_chat_ids
     assert 777 in manager.get_managed_bot("aria").allowed_chat_ids
+
+
+def test_legacy_managed_bot_record_inherits_control_allowlist(tmp_path) -> None:
+    manager = build_manager(tmp_path)
+    manager.service_manager.register(
+        "telegram",
+        type(
+            "ControlService",
+            (),
+            {
+                "status": lambda self: {"allowed_user_ids": [8540610357]},
+                "is_running": lambda self: True,
+                "start": lambda self: None,
+                "stop": lambda self: None,
+            },
+        )(),
+    )
+    manager.managed_bot_store.save(
+        [
+            TelegramManagedBot(
+                worker_id="aria",
+                bot_token="token-1",
+                bot_username="aria_bot",
+                bot_display_name="Aria",
+                enabled=True,
+            )
+        ]
+    )
+
+    record = manager.get_managed_bot("aria")
+
+    assert record.allowed_user_ids == [8540610357]
 
 
 def test_internal_worker_cannot_receive_managed_message(tmp_path) -> None:
