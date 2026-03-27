@@ -8,22 +8,15 @@ import agentic_hub.core.handlers as handlers
 from agentic_hub.catalog.catalog_manager import CatalogManager
 from agentic_hub.catalog.tool_registry import ToolRegistry
 from agentic_hub.catalog.worker_registry import WorkerRegistry
-from agentic_hub.core.approval_manager import ApprovalManager
-from agentic_hub.core.artifact_store import ArtifactStore
 from agentic_hub.core.command_handlers import CommandHandlers
 from agentic_hub.core.dead_task_store import DeadTaskStore
 from agentic_hub.core.event_log import EventLog
 from agentic_hub.core.executor import Executor
 from agentic_hub.core.hub_state import HubState
 from agentic_hub.core.legacy_tasks import DeadTaskRecord, Task, TaskResult, utc_now
-from agentic_hub.core.legacy_worker_adapter import LegacyHandlerAdapter
-from agentic_hub.core.live_agent_worker_adapter import LiveAgentWorkerAdapter
-from agentic_hub.core.live_workflow_manager import LiveWorkflowManager
 from agentic_hub.core.logging import get_logger
 from agentic_hub.core.memory_manager import MemoryManager
 from agentic_hub.core.runtime_config import (
-    APPROVALS_FILE,
-    ARTIFACTS_FILE,
     CATALOG_RUNTIME_DIR,
     CATALOG_SEED_DIR,
     DEAD_TASKS_FILE,
@@ -34,24 +27,22 @@ from agentic_hub.core.runtime_config import (
     STATE_FILE,
     TASKS_FILE,
 )
-from agentic_hub.core.runtime_coordinator import RuntimeCoordinator
 from agentic_hub.core.service_manager import ServiceManager
 from agentic_hub.core.task_store import TaskStore
 from agentic_hub.core.task_types import HubTask
 from agentic_hub.core.telegram_runtime_manager import TelegramRuntimeManager
+from agentic_hub.core.vanta_admin import VantaAdminAgent
 from agentic_hub.services.telegram.service import TelegramPollingService
 
 
 class Hub:
-    def __init__(self):
+    def __init__(self, *, register_services: bool = True):
         self.project_root = Path(__file__).resolve().parents[3]
         self.logger = get_logger()
         self.state = HubState()
         self.service_manager = ServiceManager()
         self.tool_registry = ToolRegistry()
         self.worker_registry = WorkerRegistry()
-        self.approval_manager = ApprovalManager(APPROVALS_FILE)
-        self.artifact_store = ArtifactStore(ARTIFACTS_FILE)
         self.event_log = EventLog(EVENTS_FILE)
         self.memory_manager = MemoryManager()
         self.catalog_manager = CatalogManager(
@@ -68,50 +59,9 @@ class Hub:
             runtime_dir=RUNTIME_DIR,
             env_path=ENV_FILE,
         )
-        self.runtime_coordinator = RuntimeCoordinator(
-            self.worker_registry,
-            self.tool_registry,
-            approval_manager=self.approval_manager,
-            artifact_store=self.artifact_store,
-            event_log=self.event_log,
-            memory_manager=self.memory_manager,
-        )
-        self.runtime_coordinator.register_adapter(
-            "agent_worker",
-            LiveAgentWorkerAdapter(
-                worker_registry=self.worker_registry,
-                artifact_store=self.artifact_store,
-                approval_manager=self.approval_manager,
-                repo_root=self.project_root,
-            ),
-        )
-        self.runtime_coordinator.register_adapter(
-            "tool_worker",
-            LegacyHandlerAdapter(
-                handlers={
-                    "startup_task": handlers.startup_task,
-                    "start_service_task": lambda payload: handlers.start_service_task(payload, hub=self),
-                    "interval_task": handlers.interval_task,
-                },
-                logger=self.logger,
-            ),
-        )
-        self.runtime_coordinator.register_adapter(
-            "approval_worker",
-            LegacyHandlerAdapter(
-                handlers={"approval": lambda payload: {"status": "approval worker idle", "payload": payload}},
-                logger=self.logger,
-            ),
-        )
-        self.live_workflow_manager = LiveWorkflowManager(
-            runtime_coordinator=self.runtime_coordinator,
-            artifact_store=self.artifact_store,
-            runtime_dir=RUNTIME_DIR,
-            repo_root=self.project_root,
-        )
-
-        self._register_services()
-        self.telegram_runtime_manager.register_persisted_managed_bots()
+        if register_services:
+            self._register_services()
+            self.telegram_runtime_manager.register_persisted_managed_bots()
 
         self.executor = Executor(
             handlers={
@@ -122,6 +72,7 @@ class Hub:
             logger=self.logger,
         )
         self.command_handlers = CommandHandlers(self)
+        self.vanta_admin = VantaAdminAgent(self)
         self.task_store = TaskStore(TASKS_FILE)
         self.dead_task_store = DeadTaskStore(DEAD_TASKS_FILE)
         self.tasks = self.task_store.load()
@@ -280,7 +231,10 @@ class Hub:
 
     def submit_and_run_task(self, task: HubTask) -> dict:
         command = task.payload["command"]
-        text = self.command_handlers.handle(command, task.payload)
+        if command.strip().startswith("/"):
+            text = self.command_handlers.handle(command, task.payload)
+        else:
+            text = self.vanta_admin.handle_message(command, task.payload)
         return {"text": text}
 
     def handle_managed_message(self, *, worker_id: str, text: str, payload: dict) -> str:

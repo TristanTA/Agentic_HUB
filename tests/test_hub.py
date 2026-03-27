@@ -450,7 +450,7 @@ def test_hub_creates_default_tasks_file_when_missing(tmp_path, monkeypatch):
 
     assert not task_file.exists()
 
-    hub = Hub()
+    hub = Hub(register_services=False)
 
     assert task_file.exists()
     assert len(hub.tasks) >= 1

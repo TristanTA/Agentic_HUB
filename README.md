@@ -2,6 +2,12 @@
 
 Agentic Hub is organized around a stable Python runtime plus DLC-style content packs.
 
+The runtime now centers on one Telegram control bot, Vanta:
+
+- slash commands are limited to operational lookups
+- plain-English admin requests are handled by Vanta and translated into structured runtime actions
+- catalog mutations default to runtime overrides rather than editing authored pack files
+
 ## Repo layout
 
 - `src/agentic_hub/core/`: hub runtime, orchestration, task handling, approvals, memory, and state
@@ -44,6 +50,6 @@ Workers now declare an `interface_mode`:
 
 - `managed`: owns its own Telegram bot token and talks through its own bot identity
 - `internal`: only callable by runtime tasks, tools, or other workers
-- `hybrid`: internal for execution, but messageable through explicit Vanta slash commands
+- `hybrid`: reserved for future use
 
 Vanta remains the control bot. Managed worker bot registrations and Telegram conversation state are stored under `data/runtime/`.

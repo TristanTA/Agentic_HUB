@@ -135,59 +135,6 @@ class TelegramRuntimeManager:
             "service": status,
         }
 
-    def open_hybrid_session(self, worker_id: str, chat_id: int, user_id: int | None) -> TelegramConversationSession:
-        worker = self.worker_registry.get_worker(worker_id)
-        self._require_interface_mode(worker, "hybrid")
-        existing = self._find_session("vanta_hybrid", worker_id, chat_id)
-        if existing:
-            existing.active = True
-            existing.updated_at = utc_now()
-            self._save_session(existing)
-            return existing
-        session = TelegramConversationSession(
-            session_id=str(uuid4()),
-            worker_id=worker_id,
-            channel_type="vanta_hybrid",
-            chat_id=chat_id,
-            user_id=user_id,
-        )
-        sessions = self.session_store.load()
-        sessions.append(session)
-        self.session_store.save(sessions)
-        return session
-
-    def list_hybrid_sessions(self, chat_id: int) -> list[TelegramConversationSession]:
-        return [
-            session
-            for session in self.session_store.load()
-            if session.channel_type == "vanta_hybrid" and session.chat_id == chat_id and session.active
-        ]
-
-    def close_hybrid_session(self, chat_id: int, worker_id: str | None = None) -> list[TelegramConversationSession]:
-        sessions = self.session_store.load()
-        closed: list[TelegramConversationSession] = []
-        for session in sessions:
-            if session.channel_type != "vanta_hybrid" or session.chat_id != chat_id or not session.active:
-                continue
-            if worker_id is not None and session.worker_id != worker_id:
-                continue
-            session.active = False
-            session.updated_at = utc_now()
-            closed.append(session)
-        self.session_store.save(sessions)
-        return closed
-
-    def send_hybrid_message(
-        self,
-        *,
-        chat_id: int,
-        user_id: int | None,
-        worker_id: str | None,
-        text: str,
-    ) -> str:
-        session = self._resolve_hybrid_session(chat_id=chat_id, user_id=user_id, worker_id=worker_id)
-        return self._reply_in_session(session, text)
-
     def handle_managed_message(self, worker_id: str, chat_id: int, user_id: int | None, text: str) -> str:
         worker = self.worker_registry.get_worker(worker_id)
         self._require_interface_mode(worker, "managed")
@@ -207,23 +154,6 @@ class TelegramRuntimeManager:
 
     def service_name_for_worker(self, worker_id: str) -> str:
         return f"telegram_worker_{worker_id}"
-
-    def _resolve_hybrid_session(
-        self,
-        *,
-        chat_id: int,
-        user_id: int | None,
-        worker_id: str | None,
-    ) -> TelegramConversationSession:
-        if worker_id:
-            session = self.open_hybrid_session(worker_id, chat_id, user_id)
-            return session
-        active = self.list_hybrid_sessions(chat_id)
-        if not active:
-            raise ValueError("No active hybrid session. Use /chat-open <worker_id> first.")
-        if len(active) > 1:
-            raise ValueError("Multiple hybrid sessions are active. Specify the worker_id.")
-        return active[0]
 
     def _reply_in_session(self, session: TelegramConversationSession, text: str) -> str:
         worker = self.worker_registry.get_worker(session.worker_id)

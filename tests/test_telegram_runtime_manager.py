@@ -59,20 +59,21 @@ def test_attach_managed_bot_succeeds_for_managed_worker(tmp_path, monkeypatch) -
     assert manager.list_managed_bots()[0].worker_id == "aria"
 
 
-def test_hybrid_session_reply_persists_history(tmp_path) -> None:
+def test_managed_session_reply_persists_history(tmp_path) -> None:
     manager = build_manager(tmp_path)
+    worker = manager.worker_registry.get_worker("aria")
+    worker.interface_mode = "managed"
 
-    session = manager.open_hybrid_session("aria", chat_id=100, user_id=200)
-    reply = manager.send_hybrid_message(chat_id=100, user_id=200, worker_id=None, text="hello")
+    reply = manager.handle_managed_message("aria", chat_id=100, user_id=200, text="hello")
 
-    assert session.worker_id == "aria"
     assert reply == "aria:hello"
-    stored = manager.list_hybrid_sessions(100)[0]
+    stored = manager._find_session("managed_bot", "aria", 100)
+    assert stored is not None
     assert len(stored.messages) == 2
 
 
-def test_internal_worker_cannot_open_hybrid_session(tmp_path) -> None:
+def test_internal_worker_cannot_receive_managed_message(tmp_path) -> None:
     manager = build_manager(tmp_path)
 
     with pytest.raises(ValueError):
-        manager.open_hybrid_session("atlas", chat_id=100, user_id=200)
+        manager.handle_managed_message("atlas", chat_id=100, user_id=200, text="hello")

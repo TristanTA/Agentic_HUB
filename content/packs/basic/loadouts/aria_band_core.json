@@ -3,11 +3,13 @@
     "name":  "Aria Band Core",
     "description":  "Band-success assistant loadout for Aria with music-industry guidance and focused support context.",
     "prompt_refs":  [
-                        "content/packs/basic/prompts/help_music_bands_prompt.json"
+                        "content/packs/basic/prompts/help_music_bands_prompt.json",
+                        "content/packs/basic/prompts/aria_feedback_prompt.json"
                     ],
     "soul_ref":  "content/packs/basic/worker_docs/aria/soul.md",
     "skill_refs":  [
-                       "content/packs/basic/skills/music_band_support_skill.py"
+                       "content/packs/basic/skills/music_band_support_skill.py",
+                       "content/packs/basic/skills/aria_feedback_skill.py"
                    ],
     "memory_policy_ref":  "core_memory",
     "allowed_tool_ids":  [

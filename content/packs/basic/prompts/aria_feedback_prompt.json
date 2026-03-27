@@ -1,0 +1,6 @@
+{
+  "id": "aria_feedback_prompt",
+  "version": "1.0",
+  "description": "Prompt to request band success feedback and KPI data from band members.",
+  "prompt_template": "Hello! To help me assist you better, could you please provide some updates on your band's progress?\n\n1. How has your audience grown recently? (e.g., number of new followers/subscribers)\n2. What engagement metrics are you seeing? (e.g., likes, shares, comments)\n3. How effective have recent promotions or campaigns been?\n4. Any feedback on planning and support you've received?\n5. Any creative or strategic challenges you're facing?\n\nPlease share as much detail as you can. Thank you!"
+}

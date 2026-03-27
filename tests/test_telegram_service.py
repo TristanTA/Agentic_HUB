@@ -191,6 +191,7 @@ def test_start_and_stop_service_lifecycle() -> None:
     assert service.is_running() is True
     assert client.commands_set is not None
     assert any(item["command"] == "help" for item in client.commands_set)
+    assert all(item["command"] not in {"new", "edit", "delete", "approve"} for item in client.commands_set)
 
     service.stop()
     assert service.is_running() is False
