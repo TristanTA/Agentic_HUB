@@ -42,7 +42,7 @@ class LiveWorkflowManager:
         requested_by_user_id: str | None = None,
         requested_from_chat_id: str | None = None,
         research_worker_id: str = "nova",
-        operator_worker_id: str = "aria",
+        operator_worker_id: str = "forge",
     ) -> LiveWorkflow:
         workflow = LiveWorkflow(
             workflow_id=str(uuid4()),

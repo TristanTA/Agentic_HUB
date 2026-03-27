@@ -1,0 +1,20 @@
+{
+    "worker_id":  "forge",
+    "name":  "Forge",
+    "type_id":  "agent_worker",
+    "role_id":  "operator",
+    "loadout_id":  "operator_core",
+    "interface_mode":  "internal",
+    "assigned_queues":  [
+                            "default"
+                        ],
+    "priority_bias":  3,
+    "owner":  "hub",
+    "enabled":  true,
+    "tags":  [
+                 "seed",
+                 "operator",
+                 "implementation"
+             ],
+    "source":  "seed"
+}

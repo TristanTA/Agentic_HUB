@@ -115,7 +115,7 @@ class DummyWorkflowManager:
     def __init__(self) -> None:
         self.items = []
 
-    def start_worker_improvement(self, *, target_worker_id: str, objective: str, requested_by_user_id=None, requested_from_chat_id=None, research_worker_id="nova", operator_worker_id="aria"):
+    def start_worker_improvement(self, *, target_worker_id: str, objective: str, requested_by_user_id=None, requested_from_chat_id=None, research_worker_id="nova", operator_worker_id="forge"):
         workflow = type(
             "Workflow",
             (),
