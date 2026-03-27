@@ -16,19 +16,25 @@ class TelegramClient:
         r.raise_for_status()
         return r.json()
 
-    def send_message(self, chat_id: int, text: str) -> dict:
+    def send_message(self, chat_id: int, text: str, *, message_thread_id: int | None = None) -> dict:
+        payload = {"chat_id": chat_id, "text": text}
+        if message_thread_id is not None:
+            payload["message_thread_id"] = message_thread_id
         r = requests.post(
             f"{self.base_url}/sendMessage",
-            json={"chat_id": chat_id, "text": text},
+            json=payload,
             timeout=15,
         )
         r.raise_for_status()
         return r.json()
 
-    def send_chat_action(self, chat_id: int, action: str = "typing") -> dict:
+    def send_chat_action(self, chat_id: int, action: str = "typing", *, message_thread_id: int | None = None) -> dict:
+        payload = {"chat_id": chat_id, "action": action}
+        if message_thread_id is not None:
+            payload["message_thread_id"] = message_thread_id
         r = requests.post(
             f"{self.base_url}/sendChatAction",
-            json={"chat_id": chat_id, "action": action},
+            json=payload,
             timeout=15,
         )
         r.raise_for_status()

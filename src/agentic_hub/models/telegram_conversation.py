@@ -18,6 +18,7 @@ class TelegramConversationSession(BaseModel):
     worker_id: str
     channel_type: str = Field(description="managed_bot, vanta_hybrid")
     chat_id: int
+    message_thread_id: int | None = None
     user_id: int | None = None
     active: bool = True
     messages: list[TelegramConversationMessage] = Field(default_factory=list)

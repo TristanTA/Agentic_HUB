@@ -245,9 +245,10 @@ class Hub:
         return {"text": text}
 
     def handle_managed_message(self, *, worker_id: str, text: str, payload: dict) -> str:
-        return self.telegram_runtime_manager.handle_managed_message(
+        return self.telegram_runtime_manager.handle_managed_message_in_thread(
             worker_id=worker_id,
             chat_id=int(payload["chat_id"]),
+            message_thread_id=payload.get("message_thread_id"),
             user_id=payload.get("user_id"),
             text=text,
         )

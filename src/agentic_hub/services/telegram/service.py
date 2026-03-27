@@ -25,6 +25,7 @@ class TelegramPollingService:
         hub: Any,
         bot_token: str,
         allowed_user_ids: set[int] | None = None,
+        allowed_chat_ids: set[int] | None = None,
         poll_timeout: int = 20,
         idle_sleep: float = 1.0,
         mode: str = "control",
@@ -34,6 +35,7 @@ class TelegramPollingService:
         self.hub = hub
         self.client = TelegramClient(bot_token)
         self.allowed_user_ids = allowed_user_ids or set()
+        self.allowed_chat_ids = allowed_chat_ids or set()
         self.poll_timeout = poll_timeout
         self.idle_sleep = idle_sleep
         self.mode = mode
@@ -78,6 +80,7 @@ class TelegramPollingService:
             "offset": self._offset,
             "last_error": self._last_error,
             "allowed_user_ids": sorted(self.allowed_user_ids),
+            "allowed_chat_ids": sorted(self.allowed_chat_ids),
             "mode": self.mode,
             "worker_id": self.worker_id,
             "bot_username": self.bot_username,
@@ -128,6 +131,7 @@ class TelegramPollingService:
         chat = message.get("chat", {})
         chat_id = chat.get("id")
         chat_type = chat.get("type", "private")
+        message_thread_id = message.get("message_thread_id")
         text = (message.get("text") or "").strip()
         if self.mode == "managed":
             self.logger.info(
@@ -161,7 +165,21 @@ class TelegramPollingService:
                 )
             return
 
-        if self.allowed_user_ids and user_id not in self.allowed_user_ids:
+        if self.mode == "managed":
+            access = self._managed_access(chat_id=chat_id, chat_type=chat_type, user_id=user_id)
+            if not access["allowed"]:
+                self.logger.info(
+                    "Managed telegram update rejected by access rules: worker=%s chat_id=%s user_id=%s chat_type=%s allowed_users=%s allowed_chats=%s",
+                    self.worker_id,
+                    chat_id,
+                    user_id,
+                    chat_type,
+                    sorted(self.allowed_user_ids),
+                    sorted(self.allowed_chat_ids),
+                )
+                self.client.send_message(chat_id, "unauthorized", message_thread_id=message_thread_id)
+                return
+        elif self.allowed_user_ids and user_id not in self.allowed_user_ids:
             if self.mode == "managed":
                 self.logger.info(
                     "Managed telegram update rejected by allowlist: worker=%s chat_id=%s user_id=%s",
@@ -173,11 +191,29 @@ class TelegramPollingService:
             return
 
         if self.mode == "managed":
-            self._send_typing(chat_id)
-            routed = self._route_managed_message(text=text, chat_type=chat_type, chat_id=chat_id, user_id=user_id)
+            self._send_typing(chat_id, message_thread_id)
+            routed = self._route_managed_message(
+                text=text,
+                chat_type=chat_type,
+                chat_id=chat_id,
+                message_thread_id=message_thread_id,
+                user_id=user_id,
+            )
             if routed is None:
                 return
-            self.client.send_message(chat_id, routed)
+            if access["should_allow_chat"] and chat_id is not None and self.worker_id is not None:
+                try:
+                    self.hub.telegram_runtime_manager.allow_managed_chat(self.worker_id, chat_id)
+                    self.allowed_chat_ids.add(chat_id)
+                    self.logger.info(
+                        "Managed telegram chat authorized for worker=%s chat_id=%s by allowed user=%s",
+                        self.worker_id,
+                        chat_id,
+                        user_id,
+                    )
+                except Exception as exc:
+                    self.logger.warning("Failed to persist allowed chat for worker=%s chat_id=%s: %s", self.worker_id, chat_id, exc)
+            self.client.send_message(chat_id, routed, message_thread_id=message_thread_id)
             return
 
         task = HubTask(
@@ -187,13 +223,14 @@ class TelegramPollingService:
                 "command": text,
                 "source": "telegram",
                 "chat_id": chat_id,
+                "message_thread_id": message_thread_id,
                 "user_id": user_id,
                 "message_id": message.get("message_id"),
             },
         )
 
         try:
-            self._send_typing(chat_id)
+            self._send_typing(chat_id, message_thread_id)
             result = self.hub.submit_and_run_task(task)
             response_text = "ok"
             if isinstance(result, dict):
@@ -204,15 +241,23 @@ class TelegramPollingService:
             self._last_error = str(exc)
             response_text = f"error: {exc}"
 
-        self.client.send_message(chat_id, response_text)
+        self.client.send_message(chat_id, response_text, message_thread_id=message_thread_id)
 
-    def _send_typing(self, chat_id: int) -> None:
+    def _send_typing(self, chat_id: int, message_thread_id: int | None = None) -> None:
         try:
-            self.client.send_chat_action(chat_id, "typing")
+            self.client.send_chat_action(chat_id, "typing", message_thread_id=message_thread_id)
         except Exception:
             pass
 
-    def _route_managed_message(self, *, text: str, chat_type: str, chat_id: int, user_id: int) -> str | None:
+    def _route_managed_message(
+        self,
+        *,
+        text: str,
+        chat_type: str,
+        chat_id: int,
+        message_thread_id: int | None,
+        user_id: int,
+    ) -> str | None:
         if self.worker_id is None:
             self.logger.warning("Managed telegram route missing worker_id for chat_id=%s", chat_id)
             return "managed worker is not configured"
@@ -262,7 +307,24 @@ class TelegramPollingService:
         return self.hub.handle_managed_message(
             worker_id=self.worker_id,
             text=routed_text,
-            payload={"source": "telegram_managed", "chat_id": chat_id, "user_id": user_id, "chat_type": chat_type},
+            payload={
+                "source": "telegram_managed",
+                "chat_id": chat_id,
+                "message_thread_id": message_thread_id,
+                "user_id": user_id,
+                "chat_type": chat_type,
+            },
         )
+
+    def _managed_access(self, *, chat_id: int, chat_type: str, user_id: int) -> dict[str, bool]:
+        if chat_type in {"group", "supergroup"}:
+            if chat_id in self.allowed_chat_ids:
+                return {"allowed": True, "should_allow_chat": False}
+            if user_id in self.allowed_user_ids:
+                return {"allowed": True, "should_allow_chat": True}
+            return {"allowed": False, "should_allow_chat": False}
+        if not self.allowed_user_ids:
+            return {"allowed": True, "should_allow_chat": False}
+        return {"allowed": user_id in self.allowed_user_ids, "should_allow_chat": False}
 
 

@@ -71,6 +71,7 @@ class TelegramRuntimeManager:
             bot_username=username,
             bot_display_name=display_name,
             enabled=True,
+            allowed_user_ids=sorted(self._control_allowed_user_ids()),
             updated_at=utc_now(),
         )
         updated = [item for item in existing if item.worker_id != worker_id]
@@ -101,7 +102,8 @@ class TelegramRuntimeManager:
         service = TelegramPollingService(
             hub=self.hub,
             bot_token=record.bot_token,
-            allowed_user_ids=self._control_allowed_user_ids(),
+            allowed_user_ids=set(record.allowed_user_ids),
+            allowed_chat_ids=set(record.allowed_chat_ids),
             mode="managed",
             worker_id=record.worker_id,
             bot_username=record.bot_username,
@@ -137,15 +139,33 @@ class TelegramRuntimeManager:
         }
 
     def handle_managed_message(self, worker_id: str, chat_id: int, user_id: int | None, text: str) -> str:
+        return self.handle_managed_message_in_thread(
+            worker_id=worker_id,
+            chat_id=chat_id,
+            message_thread_id=None,
+            user_id=user_id,
+            text=text,
+        )
+
+    def handle_managed_message_in_thread(
+        self,
+        *,
+        worker_id: str,
+        chat_id: int,
+        message_thread_id: int | None,
+        user_id: int | None,
+        text: str,
+    ) -> str:
         worker = self.worker_registry.get_worker(worker_id)
         self._require_interface_mode(worker, "managed")
-        session = self._find_session("managed_bot", worker_id, chat_id)
+        session = self._find_session("managed_bot", worker_id, chat_id, message_thread_id)
         if session is None:
             session = TelegramConversationSession(
                 session_id=str(uuid4()),
                 worker_id=worker_id,
                 channel_type="managed_bot",
                 chat_id=chat_id,
+                message_thread_id=message_thread_id,
                 user_id=user_id,
             )
             sessions = self.session_store.load()
@@ -155,6 +175,27 @@ class TelegramRuntimeManager:
 
     def service_name_for_worker(self, worker_id: str) -> str:
         return f"telegram_worker_{worker_id}"
+
+    def allow_managed_chat(self, worker_id: str, chat_id: int) -> TelegramManagedBot:
+        records = self.load_managed_bots()
+        updated_record: TelegramManagedBot | None = None
+        for record in records:
+            if record.worker_id != worker_id:
+                continue
+            if chat_id not in record.allowed_chat_ids:
+                record.allowed_chat_ids.append(chat_id)
+                record.updated_at = utc_now()
+            updated_record = record
+            break
+        if updated_record is None:
+            raise KeyError(f"Unknown managed bot for worker_id: {worker_id}")
+        self.managed_bot_store.save(records)
+
+        service_name = self.service_name_for_worker(worker_id)
+        service_record = self.service_manager._services.get(service_name)
+        if service_record is not None:
+            service_record.service.allowed_chat_ids = set(updated_record.allowed_chat_ids)
+        return updated_record
 
     def _reply_in_session(self, session: TelegramConversationSession, text: str) -> str:
         worker = self.worker_registry.get_worker(session.worker_id)
@@ -183,9 +224,21 @@ class TelegramRuntimeManager:
         self.session_store.save(sessions)
         return reply
 
-    def _find_session(self, channel_type: str, worker_id: str, chat_id: int) -> TelegramConversationSession | None:
+    def _find_session(
+        self,
+        channel_type: str,
+        worker_id: str,
+        chat_id: int,
+        message_thread_id: int | None = None,
+    ) -> TelegramConversationSession | None:
         for session in self.session_store.load():
-            if session.channel_type == channel_type and session.worker_id == worker_id and session.chat_id == chat_id and session.active:
+            if (
+                session.channel_type == channel_type
+                and session.worker_id == worker_id
+                and session.chat_id == chat_id
+                and session.message_thread_id == message_thread_id
+                and session.active
+            ):
                 return session
         return None
 

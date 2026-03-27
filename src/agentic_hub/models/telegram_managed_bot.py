@@ -13,5 +13,7 @@ class TelegramManagedBot(BaseModel):
     bot_username: str
     bot_display_name: str
     enabled: bool = True
+    allowed_chat_ids: list[int] = Field(default_factory=list)
+    allowed_user_ids: list[int] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)

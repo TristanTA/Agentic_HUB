@@ -9,8 +9,8 @@ class FakeClient:
     def __init__(self, updates=None, fail_on_get: Exception | None = None) -> None:
         self.updates = updates or []
         self.fail_on_get = fail_on_get
-        self.sent_messages: list[tuple[int, str]] = []
-        self.chat_actions: list[tuple[int, str]] = []
+        self.sent_messages: list[tuple[int, str, int | None]] = []
+        self.chat_actions: list[tuple[int, str, int | None]] = []
         self.commands_set: list[dict[str, str]] | None = None
         self.calls = 0
 
@@ -22,12 +22,12 @@ class FakeClient:
             return {"ok": True, "result": self.updates}
         return {"ok": True, "result": []}
 
-    def send_message(self, chat_id: int, text: str) -> dict:
-        self.sent_messages.append((chat_id, text))
+    def send_message(self, chat_id: int, text: str, *, message_thread_id: int | None = None) -> dict:
+        self.sent_messages.append((chat_id, text, message_thread_id))
         return {"ok": True}
 
-    def send_chat_action(self, chat_id: int, action: str = "typing") -> dict:
-        self.chat_actions.append((chat_id, action))
+    def send_chat_action(self, chat_id: int, action: str = "typing", *, message_thread_id: int | None = None) -> dict:
+        self.chat_actions.append((chat_id, action, message_thread_id))
         return {"ok": True}
 
     def set_my_commands(self, commands: list[dict[str, str]]) -> dict:
@@ -42,6 +42,8 @@ class FakeHub:
     def __init__(self) -> None:
         self.received_tasks = []
         self.managed_messages = []
+        self.allowed_chats = []
+        self.telegram_runtime_manager = self
 
     def submit_and_run_task(self, task):
         self.received_tasks.append(task)
@@ -54,12 +56,16 @@ class FakeHub:
         self.managed_messages.append((worker_id, text, payload))
         return f"{worker_id}: {text}"
 
+    def allow_managed_chat(self, worker_id: str, chat_id: int):
+        self.allowed_chats.append((worker_id, chat_id))
 
-def make_service(hub: FakeHub, client: FakeClient, allowed_user_ids=None) -> TelegramPollingService:
+
+def make_service(hub: FakeHub, client: FakeClient, allowed_user_ids=None, allowed_chat_ids=None) -> TelegramPollingService:
     service = TelegramPollingService(
         hub=hub,
         bot_token="fake-token",
         allowed_user_ids=allowed_user_ids or set(),
+        allowed_chat_ids=allowed_chat_ids or set(),
         poll_timeout=0,
         idle_sleep=0,
     )
@@ -90,8 +96,8 @@ def test_handle_update_authorized_user_creates_task_and_sends_response() -> None
     assert task.payload["command"] == "/ping"
     assert task.payload["chat_id"] == 999
     assert task.payload["user_id"] == 123
-    assert client.chat_actions == [(999, "typing")]
-    assert client.sent_messages == [(999, "hub alive")]
+    assert client.chat_actions == [(999, "typing", None)]
+    assert client.sent_messages == [(999, "hub alive", None)]
 
 
 def test_handle_update_unauthorized_user_is_rejected() -> None:
@@ -112,7 +118,7 @@ def test_handle_update_unauthorized_user_is_rejected() -> None:
     service._handle_update(update)
 
     assert hub.received_tasks == []
-    assert client.sent_messages == [(999, "unauthorized")]
+    assert client.sent_messages == [(999, "unauthorized", None)]
 
 
 def test_handle_update_ignores_missing_text() -> None:
@@ -151,8 +157,8 @@ def test_run_loop_advances_offset_and_processes_update() -> None:
     client = FakeClient(updates=updates)
     service = make_service(hub, client, allowed_user_ids={123})
 
-    def stop_after_first_message(chat_id: int, text: str) -> dict:
-        client.sent_messages.append((chat_id, text))
+    def stop_after_first_message(chat_id: int, text: str, *, message_thread_id: int | None = None) -> dict:
+        client.sent_messages.append((chat_id, text, message_thread_id))
         service._stop_event.set()
         return {"ok": True}
 
@@ -162,7 +168,7 @@ def test_run_loop_advances_offset_and_processes_update() -> None:
 
     assert service._offset == 201
     assert len(hub.received_tasks) == 1
-    assert client.sent_messages == [(999, "hub alive")]
+    assert client.sent_messages == [(999, "hub alive", None)]
 
 
 def test_run_loop_records_last_error_on_failure() -> None:
@@ -245,9 +251,9 @@ def test_managed_mode_private_chat_routes_directly_to_worker() -> None:
         }
     )
 
-    assert hub.managed_messages == [("aria", "hello", {"source": "telegram_managed", "chat_id": 555, "user_id": 123, "chat_type": "private"})]
-    assert client.chat_actions == [(555, "typing")]
-    assert client.sent_messages == [(555, "aria: hello")]
+    assert hub.managed_messages == [("aria", "hello", {"source": "telegram_managed", "chat_id": 555, "message_thread_id": None, "user_id": 123, "chat_type": "private"})]
+    assert client.chat_actions == [(555, "typing", None)]
+    assert client.sent_messages == [(555, "aria: hello", None)]
 
 
 def test_managed_mode_group_chat_requires_mention() -> None:
@@ -292,7 +298,78 @@ def test_managed_mode_group_chat_requires_mention() -> None:
     )
 
     assert hub.managed_messages[-1][1] == "hello group"
-    assert client.sent_messages[-1] == (777, "aria: hello group")
+    assert hub.allowed_chats == [("aria", 777)]
+    assert client.sent_messages[-1] == (777, "aria: hello group", None)
+
+
+def test_managed_mode_group_chat_allows_future_messages_from_same_chat(tmp_path=None) -> None:
+    hub = FakeHub()
+    client = FakeClient()
+    service = TelegramPollingService(
+        hub=hub,
+        bot_token="fake-token",
+        allowed_user_ids={123},
+        allowed_chat_ids={777},
+        poll_timeout=0,
+        idle_sleep=0,
+        mode="managed",
+        worker_id="aria",
+        bot_username="aria_bot",
+    )
+    service.client = client
+
+    service._handle_update(
+        {
+            "update_id": 304,
+            "message": {
+                "message_id": 16,
+                "text": "@aria_bot hello from bandmate",
+                "chat": {"id": 777, "type": "group"},
+                "from": {"id": 555},
+            },
+        }
+    )
+
+    assert hub.managed_messages[-1][2]["user_id"] == 555
+    assert client.sent_messages[-1] == (777, "aria: hello from bandmate", None)
+
+
+def test_managed_mode_topic_replies_stay_in_thread() -> None:
+    hub = FakeHub()
+    client = FakeClient()
+    service = TelegramPollingService(
+        hub=hub,
+        bot_token="fake-token",
+        allowed_user_ids={123},
+        allowed_chat_ids={777},
+        poll_timeout=0,
+        idle_sleep=0,
+        mode="managed",
+        worker_id="aria",
+        bot_username="aria_bot",
+    )
+    service.client = client
+
+    service._handle_update(
+        {
+            "update_id": 305,
+            "message": {
+                "message_id": 17,
+                "message_thread_id": 9,
+                "text": "@aria_bot hello topic",
+                "chat": {"id": 777, "type": "supergroup"},
+                "from": {"id": 555},
+            },
+        }
+    )
+
+    assert hub.managed_messages[-1] == (
+        "aria",
+        "hello topic",
+        {"source": "telegram_managed", "chat_id": 777, "message_thread_id": 9, "user_id": 555, "chat_type": "supergroup"},
+    )
+    assert client.chat_actions[-1] == (777, "typing", 9)
+    assert client.sent_messages[-1] == (777, "aria: hello topic", 9)
 
 
 def test_managed_mode_ignores_bot_authors() -> None:
