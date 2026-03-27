@@ -27,6 +27,7 @@ class TelegramRuntimeManager:
         service_manager,
         runtime_dir: Path,
         env_path: Path,
+        skill_library=None,
     ) -> None:
         self.hub = hub
         self.worker_registry = worker_registry
@@ -34,7 +35,7 @@ class TelegramRuntimeManager:
         self.env_path = env_path
         self.managed_bot_store = RuntimeModelStore(runtime_dir / "managed_telegram_bots.json", TelegramManagedBot)
         self.session_store = RuntimeModelStore(runtime_dir / "telegram_conversation_sessions.json", TelegramConversationSession)
-        self.conversation_agent = OpenAIConversationAgent(worker_registry)
+        self.conversation_agent = OpenAIConversationAgent(worker_registry, skill_library=skill_library)
 
     def load_managed_bots(self) -> list[TelegramManagedBot]:
         return self.managed_bot_store.load()

@@ -59,6 +59,12 @@ class AdminExecutor:
             "update_worker": self._update_worker,
             "create_loadout": self._create_loadout,
             "attach_managed_bot": self._attach_managed_bot,
+            "propose_skill": self._propose_skill,
+            "approve_skill": self._approve_skill,
+            "reject_skill": self._reject_skill,
+            "attach_skill_to_loadout": self._attach_skill_to_loadout,
+            "list_skills": self._list_skills,
+            "review_skills": self._review_skills,
             "start_bot": self._start_bot,
             "stop_bot": self._stop_bot,
             "run_smoke_test": self._run_smoke_test,
@@ -162,6 +168,76 @@ class AdminExecutor:
             summary=f"Attached managed Telegram bot `@{record.bot_username}` to `{worker_id}`.",
             changed_ids=[worker_id],
             validation_results=[f"managed bot `{record.bot_username}` is registered"],
+        )
+
+    def _propose_skill(self, action: AdminAction) -> AdminActionResult:
+        document, proposal = self.hub.skill_library.propose_skill(
+            str(action.params["request_text"]),
+            target_loadout_ids=list(action.params["target_loadout_ids"]),
+            explicit=bool(action.params.get("explicit", False)),
+        )
+        return AdminActionResult(
+            kind=action.kind,
+            status="completed",
+            summary=proposal.approval_summary,
+            changed_ids=[document.skill_id],
+            validation_results=[f"draft skill `{document.skill_id}` stored in runtime library"],
+        )
+
+    def _approve_skill(self, action: AdminAction) -> AdminActionResult:
+        loadout_ids = list(action.params.get("loadout_ids", [])) or None
+        document = self.hub.skill_library.approve_skill(str(action.params["skill_id"]), loadout_ids=loadout_ids)
+        validation_results = [f"skill `{document.skill_id}` approved"]
+        for loadout_id in document.target_loadout_ids:
+            validation_results.append(f"skill attached to loadout `{loadout_id}`")
+        return AdminActionResult(
+            kind=action.kind,
+            status="completed",
+            summary=f"Approved skill `{document.skill_id}` and attached it to the requested loadouts.",
+            changed_ids=[document.skill_id, *document.target_loadout_ids],
+            validation_results=validation_results,
+        )
+
+    def _reject_skill(self, action: AdminAction) -> AdminActionResult:
+        document = self.hub.skill_library.reject_skill(str(action.params["skill_id"]))
+        return AdminActionResult(
+            kind=action.kind,
+            status="completed",
+            summary=f"Rejected skill `{document.skill_id}`.",
+            changed_ids=[document.skill_id],
+            validation_results=[f"skill `{document.skill_id}` remains unattached"],
+        )
+
+    def _attach_skill_to_loadout(self, action: AdminAction) -> AdminActionResult:
+        skill_id = str(action.params["skill_id"])
+        loadout_id = str(action.params["loadout_id"])
+        self.hub.skill_library.attach_skill_to_loadout(skill_id, loadout_id)
+        return AdminActionResult(
+            kind=action.kind,
+            status="completed",
+            summary=f"Attached skill `{skill_id}` to loadout `{loadout_id}`.",
+            changed_ids=[skill_id, loadout_id],
+            validation_results=[f"loadout `{loadout_id}` now references skill `{skill_id}`"],
+        )
+
+    def _list_skills(self, action: AdminAction) -> AdminActionResult:
+        statuses = set(action.params.get("statuses", [])) or None
+        skills = self.hub.skill_library.list_skills(statuses=statuses)
+        rows = [f"{skill.skill_id} | {skill.status} | usage={skill.usage_count}" for skill in skills]
+        return AdminActionResult(
+            kind=action.kind,
+            status="completed",
+            summary="\n".join(rows) if rows else "No skills found.",
+        )
+
+    def _review_skills(self, action: AdminAction) -> AdminActionResult:
+        report = self.hub.skill_library.generate_review_report()
+        rows = [f"{item.skill_id} | {item.recommendation} | {item.reason}" for item in report.items]
+        return AdminActionResult(
+            kind=action.kind,
+            status="completed",
+            summary="\n".join(rows) if rows else "No skills require review actions.",
+            changed_ids=[report.report_id],
         )
 
     def _start_bot(self, action: AdminAction) -> AdminActionResult:

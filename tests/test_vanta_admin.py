@@ -14,6 +14,12 @@ def build_hub(tmp_path: Path) -> Hub:
     for store in hub.catalog_manager.override_stores.values():
         store.path = tmp_path / "catalog_overrides" / store.path.name
     hub.catalog_manager.reload_catalog()
+    hub.skill_library.runtime_dir = tmp_path
+    hub.skill_library.skills_dir = tmp_path / "skills"
+    hub.skill_library.document_store.path = tmp_path / "skill_library.json"
+    hub.skill_library.gap_store.path = tmp_path / "skill_gaps.json"
+    hub.skill_library.proposal_store.path = tmp_path / "skill_proposals.json"
+    hub.skill_library.review_store.path = tmp_path / "skill_review_reports.json"
     return hub
 
 
@@ -81,3 +87,39 @@ def test_plain_language_status_request_maps_to_admin_action(tmp_path) -> None:
     )
 
     assert "Hub `" in result
+
+
+def test_explicit_skill_request_requires_approval_before_attachment(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    proposal = hub.vanta_admin.handle_message(
+        "Create a skill for handling banana intake requests",
+        {"source": "telegram", "chat_id": 1, "user_id": 2},
+    )
+
+    assert "Approve this skill?" in proposal
+    assert "Reusable skill" in proposal
+
+    approval = hub.vanta_admin.handle_message(
+        "approve",
+        {"source": "telegram", "chat_id": 1, "user_id": 2},
+    )
+
+    assert "Approved skill" in approval
+    loadout = next(item for item in hub.catalog_manager.list_objects("loadouts") if item.loadout_id == "operator_core")
+    assert loadout.skill_refs
+
+
+def test_repeated_requests_trigger_skill_proposal(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+    first = hub.vanta_admin.handle_message(
+        "We need a consistent banana triage playbook",
+        {"source": "telegram", "chat_id": 2, "user_id": 3},
+    )
+    second = hub.vanta_admin.handle_message(
+        "We need a consistent banana triage playbook",
+        {"source": "telegram", "chat_id": 2, "user_id": 3},
+    )
+
+    assert "noted that repeated capability request" in first
+    assert "Approve this skill?" in second

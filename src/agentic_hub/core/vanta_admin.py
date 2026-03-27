@@ -45,13 +45,32 @@ class VantaAdminAgent:
             return plan.follow_up_question
 
         if not plan.actions:
-            return plan.reply or "I can help with workers, loadouts, managed Telegram bots, status checks, and runtime admin setup."
+            return plan.reply or "I can help with workers, loadouts, skills, managed Telegram bots, status checks, and runtime admin setup."
 
         result = self.executor.execute(plan.actions)
-        return self._render_execution_result(result)
+        response = self._render_execution_result(result)
+        return self._maybe_begin_skill_approval_session(session_key, plan.actions, result, response)
 
     def _continue_session(self, session_key: str, answer: str) -> str:
         session = self._sessions[session_key]
+        if session.intent == "skill_approval":
+            decision = answer.strip().lower()
+            skill_id = str(session.draft["skill_id"])
+            loadout_ids = list(session.draft.get("target_loadout_ids", []))
+            del self._sessions[session_key]
+            if decision in {"approve", "approved", "yes", "y"}:
+                result = self.executor.execute(
+                    [AdminAction(kind="approve_skill", params={"skill_id": skill_id, "loadout_ids": loadout_ids}, summary=f"Approve skill {skill_id}")]
+                )
+                return self._render_execution_result(result)
+            if decision in {"reject", "rejected", "no", "n"}:
+                result = self.executor.execute(
+                    [AdminAction(kind="reject_skill", params={"skill_id": skill_id}, summary=f"Reject skill {skill_id}")]
+                )
+                return self._render_execution_result(result)
+            self._sessions[session_key] = session
+            return "Please reply `approve` or `reject` for this skill proposal."
+
         current_field = session.required_fields.pop(0)
         session.draft[current_field] = self._normalize_field(current_field, answer)
 
@@ -109,6 +128,7 @@ class VantaAdminAgent:
                                 "You are Vanta, the Agentic Hub admin planner. "
                                 "Return valid JSON with actions, follow_up_question, follow_up_field, and reply. "
                                 "Allowed action kinds: create_worker, update_worker, create_loadout, attach_managed_bot, "
+                                "propose_skill, approve_skill, reject_skill, attach_skill_to_loadout, list_skills, review_skills, "
                                 "start_bot, stop_bot, run_smoke_test, inspect_status, list_objects, request_code_change. "
                                 "Only use request_code_change when executable code or hard-coded behavior must change."
                             ),
@@ -134,10 +154,27 @@ class VantaAdminAgent:
             return VantaPlan(actions=[AdminAction(kind="list_objects", params={"kind": "workers"}, summary="List workers")])
         if any(word in lowered for word in {"list loadouts", "show loadouts"}):
             return VantaPlan(actions=[AdminAction(kind="list_objects", params={"kind": "loadouts"}, summary="List loadouts")])
+        if any(word in lowered for word in {"list skills", "show skills", "which skills"}):
+            return VantaPlan(actions=[AdminAction(kind="list_skills", params={}, summary="List skills")])
+        if any(word in lowered for word in {"review skills", "monthly skill review", "skill review"}):
+            return VantaPlan(actions=[AdminAction(kind="review_skills", params={}, summary="Generate skill review report")])
         if any(word in lowered for word in {"hub status", "inspect hub", "show hub status"}):
             return VantaPlan(actions=[AdminAction(kind="inspect_status", params={"target": "hub"}, summary="Inspect hub status")])
 
         existing_worker_id = self._match_worker_id(text)
+        if self._is_explicit_skill_request(text):
+            draft = self._seed_draft(text)
+            target_loadout_ids = draft.get("target_loadout_ids") or [draft.get("loadout_id", "operator_core")]
+            return VantaPlan(
+                actions=[
+                    AdminAction(
+                        kind="propose_skill",
+                        params={"request_text": text, "target_loadout_ids": target_loadout_ids, "explicit": True},
+                        summary="Draft a reusable skill proposal",
+                    )
+                ]
+            )
+
         if ("start" in lowered or "stop" in lowered) and "bot" in lowered and existing_worker_id:
             kind = "start_bot" if "start" in lowered else "stop_bot"
             return VantaPlan(actions=[AdminAction(kind=kind, params={"worker_id": existing_worker_id}, summary=f"{kind} for {existing_worker_id}")])
@@ -169,10 +206,26 @@ class VantaAdminAgent:
                 actions=[AdminAction(kind="inspect_status", params={"target": existing_worker_id}, summary=f"Inspect {existing_worker_id}")]
             )
 
+        if self._looks_like_repeated_skill_gap(text):
+            gap_record = self.hub.skill_library.record_gap(text, explicit=False)
+            if self.hub.skill_library.should_propose(gap_record, explicit=False):
+                draft = self._seed_draft(text)
+                target_loadout_ids = draft.get("target_loadout_ids") or [draft.get("loadout_id", "operator_core")]
+                return VantaPlan(
+                    actions=[
+                        AdminAction(
+                            kind="propose_skill",
+                            params={"request_text": text, "target_loadout_ids": target_loadout_ids, "explicit": False},
+                            summary="Draft a reusable skill proposal from repeated demand",
+                        )
+                    ]
+                )
+            return VantaPlan(reply="I noted that repeated capability request. If it keeps coming up, I’ll draft a reusable skill for approval.")
+
         return VantaPlan(
             reply=(
-                "I can create or update workers, create loadouts, attach managed Telegram bots, start or stop bots, "
-                "and inspect hub or worker status. Ask in plain English and I’ll translate it into runtime admin actions."
+                "I can create or update workers, create loadouts, manage reusable skills, attach managed Telegram bots, "
+                "start or stop bots, and inspect hub or worker status. Ask in plain English and I’ll translate it into runtime admin actions."
             )
         )
 
@@ -230,6 +283,7 @@ class VantaAdminAgent:
         draft["type_id"] = self._match_known_id(text, [item.type_id for item in self.hub.worker_registry.list_types()]) or "agent_worker"
         draft["role_id"] = self._match_known_id(text, [item.role_id for item in self.hub.worker_registry.list_roles()]) or self._infer_role(text)
         draft["loadout_id"] = self._match_known_id(text, [item.loadout_id for item in self.hub.worker_registry.list_loadouts()]) or self._default_loadout_for_role(draft["role_id"])
+        draft["target_loadout_ids"] = [draft["loadout_id"]]
         draft["interface_mode"] = self._infer_interface_mode(text)
         token = TOKEN_PATTERN.search(text)
         if token:
@@ -371,3 +425,46 @@ class VantaAdminAgent:
     def _slugify(self, value: str) -> str:
         slug = value.strip().lower().replace(" ", "_")
         return "".join(ch for ch in slug if ch.isalnum() or ch == "_")
+
+    def _looks_like_repeated_skill_gap(self, text: str) -> bool:
+        lowered = text.lower()
+        return any(
+            phrase in lowered
+            for phrase in {
+                "we need",
+                "keep needing",
+                "often need",
+                "repeatedly need",
+                "remember how to",
+                "should know how to",
+            }
+        )
+
+    def _is_explicit_skill_request(self, text: str) -> bool:
+        lowered = text.lower()
+        return any(phrase in lowered for phrase in {"make a skill", "create a skill", "build a skill", "draft a skill"})
+
+    def _maybe_begin_skill_approval_session(
+        self,
+        session_key: str,
+        actions: list[AdminAction],
+        result: AdminExecutionResult,
+        rendered: str,
+    ) -> str:
+        if result.status != "completed":
+            return rendered
+        proposal_action = next((action for action in actions if action.kind == "propose_skill"), None)
+        if proposal_action is None:
+            return rendered
+        changed_ids = [item for action_result in result.action_results for item in action_result.changed_ids]
+        if not changed_ids:
+            return rendered
+        self._sessions[session_key] = PendingAdminRequest(
+            intent="skill_approval",
+            original_text=str(proposal_action.params["request_text"]),
+            draft={
+                "skill_id": changed_ids[0],
+                "target_loadout_ids": list(proposal_action.params.get("target_loadout_ids", [])),
+            },
+        )
+        return "\n".join([rendered, "", "Approve this skill? Reply `approve` or `reject`."])

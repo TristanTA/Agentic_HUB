@@ -27,6 +27,7 @@ from agentic_hub.core.runtime_config import (
     STATE_FILE,
     TASKS_FILE,
 )
+from agentic_hub.core.skill_library import SkillLibrary
 from agentic_hub.core.service_manager import ServiceManager
 from agentic_hub.core.task_store import TaskStore
 from agentic_hub.core.task_types import HubTask
@@ -52,12 +53,18 @@ class Hub:
             overrides_dir=CATALOG_RUNTIME_DIR,
         )
         self.catalog_manager.reload_catalog()
+        self.skill_library = SkillLibrary(
+            runtime_dir=RUNTIME_DIR,
+            repo_root=self.project_root,
+            catalog_manager=self.catalog_manager,
+        )
         self.telegram_runtime_manager = TelegramRuntimeManager(
             hub=self,
             worker_registry=self.worker_registry,
             service_manager=self.service_manager,
             runtime_dir=RUNTIME_DIR,
             env_path=ENV_FILE,
+            skill_library=self.skill_library,
         )
         if register_services:
             self._register_services()

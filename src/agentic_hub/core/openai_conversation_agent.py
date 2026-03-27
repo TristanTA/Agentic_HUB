@@ -15,8 +15,9 @@ from agentic_hub.models.worker_instance import WorkerInstance
 
 
 class OpenAIConversationAgent:
-    def __init__(self, worker_registry: WorkerRegistry) -> None:
+    def __init__(self, worker_registry: WorkerRegistry, *, skill_library=None) -> None:
         self.worker_registry = worker_registry
+        self.skill_library = skill_library
 
     def generate_reply(
         self,
@@ -33,7 +34,7 @@ class OpenAIConversationAgent:
         role = self.worker_registry.get_role(worker.role_id)
         loadout = self.worker_registry.get_loadout(worker.loadout_id)
         model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
-        supplemental_context = self._build_loadout_context(loadout)
+        supplemental_context = self._build_loadout_context(loadout, query=user_message)
 
         system_prompt_parts = [
             f"You are {worker.name}.",
@@ -87,7 +88,7 @@ class OpenAIConversationAgent:
             return "\n".join(parts).strip()
         return str(message).strip()
 
-    def _build_loadout_context(self, loadout: Loadout) -> list[str]:
+    def _build_loadout_context(self, loadout: Loadout, *, query: str) -> list[str]:
         parts: list[str] = []
         if loadout.soul_ref:
             soul_text = self._read_ref(loadout.soul_ref)
@@ -101,6 +102,12 @@ class OpenAIConversationAgent:
             skill_text = self._read_ref(ref)
             if skill_text:
                 parts.append(f"Skill ref {ref}:\n{skill_text}")
+        if self.skill_library is not None:
+            for skill in self.skill_library.find_relevant_skills(query, loadout_id=loadout.loadout_id, limit=2):
+                skill_text = self._read_ref(skill.body_path)
+                if not skill_text:
+                    continue
+                parts.append(f"Relevant skill {skill.skill_id}:\n{skill_text}")
         return parts
 
     def _read_ref(self, ref: str) -> str:
