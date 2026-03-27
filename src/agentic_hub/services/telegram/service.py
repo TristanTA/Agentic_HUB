@@ -133,6 +133,7 @@ class TelegramPollingService:
         chat_id = chat.get("id")
         chat_type = chat.get("type", "private")
         message_thread_id = self._normalize_message_thread_id(chat_type=chat_type, message_thread_id=message.get("message_thread_id"))
+        message_id = message.get("message_id")
         text = (message.get("text") or "").strip()
         if self.mode == "managed":
             self.logger.info(
@@ -202,6 +203,7 @@ class TelegramPollingService:
             )
             if routed is None:
                 return
+            self._send_seen_feedback(chat_id=chat_id, chat_type=chat_type, message_id=message_id)
             if access["should_allow_chat"] and chat_id is not None and self.worker_id is not None:
                 try:
                     self.hub.telegram_runtime_manager.allow_managed_chat(self.worker_id, chat_id)
@@ -243,6 +245,7 @@ class TelegramPollingService:
         try:
             self._send_typing(chat_id, message_thread_id)
             result = self.hub.submit_and_run_task(task)
+            self._send_seen_feedback(chat_id=chat_id, chat_type=chat_type, message_id=message_id)
             response_text = "ok"
             if isinstance(result, dict):
                 response_text = str(result.get("text", result))
@@ -257,6 +260,14 @@ class TelegramPollingService:
     def _send_typing(self, chat_id: int, message_thread_id: int | None = None) -> None:
         try:
             self.client.send_chat_action(chat_id, "typing", message_thread_id=message_thread_id)
+        except Exception:
+            pass
+
+    def _send_seen_feedback(self, *, chat_id: int, chat_type: str, message_id: int | None) -> None:
+        if chat_type not in {"group", "supergroup"} or message_id is None:
+            return
+        try:
+            self.client.set_message_reaction(chat_id, message_id, "👀")
         except Exception:
             pass
 

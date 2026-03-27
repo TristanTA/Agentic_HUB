@@ -11,6 +11,7 @@ class FakeClient:
         self.fail_on_get = fail_on_get
         self.sent_messages: list[tuple[int, str, int | None]] = []
         self.chat_actions: list[tuple[int, str, int | None]] = []
+        self.reactions: list[tuple[int, int, str, bool]] = []
         self.commands_set: list[dict[str, str]] | None = None
         self.calls = 0
 
@@ -32,6 +33,10 @@ class FakeClient:
 
     def set_my_commands(self, commands: list[dict[str, str]]) -> dict:
         self.commands_set = commands
+        return {"ok": True}
+
+    def set_message_reaction(self, chat_id: int, message_id: int, emoji: str, *, is_big: bool = False) -> dict:
+        self.reactions.append((chat_id, message_id, emoji, is_big))
         return {"ok": True}
 
     def get_me(self) -> dict:
@@ -253,6 +258,7 @@ def test_managed_mode_private_chat_routes_directly_to_worker() -> None:
 
     assert hub.managed_messages == [("aria", "hello", {"source": "telegram_managed", "chat_id": 555, "message_thread_id": None, "user_id": 123, "chat_type": "private"})]
     assert client.chat_actions == [(555, "typing", None)]
+    assert client.reactions == []
     assert client.sent_messages == [(555, "aria: hello", None)]
 
 
@@ -299,6 +305,7 @@ def test_managed_mode_group_chat_requires_mention() -> None:
 
     assert hub.managed_messages[-1][1] == "hello group"
     assert hub.allowed_chats == [("aria", 777)]
+    assert client.reactions[-1] == (777, 14, "👀", False)
     assert client.sent_messages[-1] == (777, "aria: hello group", None)
 
 
@@ -331,6 +338,7 @@ def test_managed_mode_group_chat_allows_future_messages_from_same_chat(tmp_path=
     )
 
     assert hub.managed_messages[-1][2]["user_id"] == 555
+    assert client.reactions[-1] == (777, 16, "👀", False)
     assert client.sent_messages[-1] == (777, "aria: hello from bandmate", None)
 
 
@@ -369,6 +377,7 @@ def test_managed_mode_topic_replies_stay_in_thread() -> None:
         {"source": "telegram_managed", "chat_id": 777, "message_thread_id": 9, "user_id": 555, "chat_type": "supergroup"},
     )
     assert client.chat_actions[-1] == (777, "typing", 9)
+    assert client.reactions[-1] == (777, 17, "👀", False)
     assert client.sent_messages[-1] == (777, "aria: hello topic", 9)
 
 
@@ -407,6 +416,7 @@ def test_managed_mode_general_topic_normalizes_thread_id_to_root_chat() -> None:
         {"source": "telegram_managed", "chat_id": 777, "message_thread_id": None, "user_id": 555, "chat_type": "supergroup"},
     )
     assert client.chat_actions[-1] == (777, "typing", None)
+    assert client.reactions[-1] == (777, 18, "👀", False)
     assert client.sent_messages[-1] == (777, "aria: hello general", None)
 
 
