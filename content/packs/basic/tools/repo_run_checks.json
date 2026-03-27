@@ -1,0 +1,13 @@
+{
+    "tool_id":  "repo_run_checks",
+    "name":  "Repo Run Checks",
+    "description":  "Run verification commands against the repository.",
+    "capability_tags":  [
+                            "repo",
+                            "verify"
+                        ],
+    "safety_level":  "medium",
+    "implementation_ref":  "agentic_hub.core.repo_tools.RepoTools.run_command",
+    "enabled":  true,
+    "source":  "seed"
+}

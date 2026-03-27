@@ -31,6 +31,11 @@ class TelegramPollingService:
         {"command": "chat_open", "description": "Open a hybrid worker chat session"},
         {"command": "chat", "description": "Send a message to a hybrid worker"},
         {"command": "chat_close", "description": "Close hybrid worker chat sessions"},
+        {"command": "improve_worker", "description": "Run a live research-to-implementation workflow"},
+        {"command": "workflows", "description": "List live worker-improvement workflows"},
+        {"command": "workflow", "description": "Inspect one workflow"},
+        {"command": "approve", "description": "Approve a pending workflow change set"},
+        {"command": "reject", "description": "Reject a pending workflow change set"},
     ]
 
     def __init__(

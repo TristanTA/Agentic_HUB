@@ -1,0 +1,19 @@
+{
+    "worker_id":  "nova",
+    "name":  "Nova",
+    "type_id":  "agent_worker",
+    "role_id":  "researcher",
+    "loadout_id":  "research_core",
+    "interface_mode":  "internal",
+    "assigned_queues":  [
+                            "default"
+                        ],
+    "priority_bias":  2,
+    "owner":  "hub",
+    "enabled":  true,
+    "tags":  [
+                 "seed",
+                 "research"
+             ],
+    "source":  "seed"
+}

@@ -1,0 +1,13 @@
+{
+    "tool_id":  "repo_delete_file",
+    "name":  "Repo Delete File",
+    "description":  "Delete a repository file by relative path.",
+    "capability_tags":  [
+                            "repo",
+                            "write"
+                        ],
+    "safety_level":  "high",
+    "implementation_ref":  "agentic_hub.core.repo_tools.RepoTools.delete_file",
+    "enabled":  true,
+    "source":  "seed"
+}

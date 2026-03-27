@@ -11,7 +11,10 @@
                                "message",
                                "plan",
                                "catalog",
-                               "review"
+                               "review",
+                               "research_request",
+                               "implementation_request",
+                               "verification_request"
                            ],
     "source":  "seed"
 }

@@ -1,43 +1,58 @@
-﻿import os
+import os
 import time
 import uuid
 from datetime import timedelta
+from pathlib import Path
 
+import agentic_hub.core.handlers as handlers
+from agentic_hub.catalog.catalog_manager import CatalogManager
+from agentic_hub.catalog.tool_registry import ToolRegistry
+from agentic_hub.catalog.worker_registry import WorkerRegistry
 from agentic_hub.core.approval_manager import ApprovalManager
 from agentic_hub.core.artifact_store import ArtifactStore
-from agentic_hub.catalog.catalog_manager import CatalogManager
-from agentic_hub.core.runtime_config import DEAD_TASKS_FILE, HEARTBEAT_SECONDS, STATE_FILE, TASKS_FILE
-from agentic_hub.core.runtime_config import CATALOG_RUNTIME_DIR, CATALOG_SEED_DIR, ENV_FILE, RUNTIME_DIR
+from agentic_hub.core.command_handlers import CommandHandlers
 from agentic_hub.core.dead_task_store import DeadTaskStore
 from agentic_hub.core.event_log import EventLog
 from agentic_hub.core.executor import Executor
+from agentic_hub.core.hub_state import HubState
+from agentic_hub.core.legacy_tasks import DeadTaskRecord, Task, TaskResult, utc_now
 from agentic_hub.core.legacy_worker_adapter import LegacyHandlerAdapter
+from agentic_hub.core.live_agent_worker_adapter import LiveAgentWorkerAdapter
+from agentic_hub.core.live_workflow_manager import LiveWorkflowManager
 from agentic_hub.core.logging import get_logger
 from agentic_hub.core.memory_manager import MemoryManager
+from agentic_hub.core.runtime_config import (
+    APPROVALS_FILE,
+    ARTIFACTS_FILE,
+    CATALOG_RUNTIME_DIR,
+    CATALOG_SEED_DIR,
+    DEAD_TASKS_FILE,
+    ENV_FILE,
+    EVENTS_FILE,
+    HEARTBEAT_SECONDS,
+    RUNTIME_DIR,
+    STATE_FILE,
+    TASKS_FILE,
+)
 from agentic_hub.core.runtime_coordinator import RuntimeCoordinator
-from agentic_hub.core.hub_state import HubState
-from agentic_hub.core.task_store import TaskStore
-from agentic_hub.core.telegram_runtime_manager import TelegramRuntimeManager
-from agentic_hub.core.legacy_tasks import DeadTaskRecord, Task, TaskResult, utc_now
 from agentic_hub.core.service_manager import ServiceManager
-from agentic_hub.core.command_handlers import CommandHandlers
+from agentic_hub.core.task_store import TaskStore
 from agentic_hub.core.task_types import HubTask
+from agentic_hub.core.telegram_runtime_manager import TelegramRuntimeManager
 from agentic_hub.services.telegram.service import TelegramPollingService
-import agentic_hub.core.handlers as handlers
-from agentic_hub.catalog.tool_registry import ToolRegistry
-from agentic_hub.catalog.worker_registry import WorkerRegistry
 
 
 class Hub:
     def __init__(self):
+        self.project_root = Path(__file__).resolve().parents[3]
         self.logger = get_logger()
         self.state = HubState()
         self.service_manager = ServiceManager()
         self.tool_registry = ToolRegistry()
         self.worker_registry = WorkerRegistry()
-        self.approval_manager = ApprovalManager()
-        self.artifact_store = ArtifactStore()
-        self.event_log = EventLog()
+        self.approval_manager = ApprovalManager(APPROVALS_FILE)
+        self.artifact_store = ArtifactStore(ARTIFACTS_FILE)
+        self.event_log = EventLog(EVENTS_FILE)
         self.memory_manager = MemoryManager()
         self.catalog_manager = CatalogManager(
             self.worker_registry,
@@ -62,6 +77,15 @@ class Hub:
             memory_manager=self.memory_manager,
         )
         self.runtime_coordinator.register_adapter(
+            "agent_worker",
+            LiveAgentWorkerAdapter(
+                worker_registry=self.worker_registry,
+                artifact_store=self.artifact_store,
+                approval_manager=self.approval_manager,
+                repo_root=self.project_root,
+            ),
+        )
+        self.runtime_coordinator.register_adapter(
             "tool_worker",
             LegacyHandlerAdapter(
                 handlers={
@@ -71,6 +95,19 @@ class Hub:
                 },
                 logger=self.logger,
             ),
+        )
+        self.runtime_coordinator.register_adapter(
+            "approval_worker",
+            LegacyHandlerAdapter(
+                handlers={"approval": lambda payload: {"status": "approval worker idle", "payload": payload}},
+                logger=self.logger,
+            ),
+        )
+        self.live_workflow_manager = LiveWorkflowManager(
+            runtime_coordinator=self.runtime_coordinator,
+            artifact_store=self.artifact_store,
+            runtime_dir=RUNTIME_DIR,
+            repo_root=self.project_root,
         )
 
         self._register_services()
@@ -84,9 +121,7 @@ class Hub:
             },
             logger=self.logger,
         )
-
         self.command_handlers = CommandHandlers(self)
-
         self.task_store = TaskStore(TASKS_FILE)
         self.dead_task_store = DeadTaskStore(DEAD_TASKS_FILE)
         self.tasks = self.task_store.load()
@@ -107,10 +142,7 @@ class Hub:
             try:
                 allowed_user_ids.add(int(value))
             except ValueError:
-                self.logger.warning(
-                    "Ignoring invalid TELEGRAM_ALLOWED_USER_IDS entry: %s",
-                    value,
-                )
+                self.logger.warning("Ignoring invalid TELEGRAM_ALLOWED_USER_IDS entry: %s", value)
 
         if not bot_token:
             self.logger.warning("TELEGRAM_BOT_TOKEN not set; telegram service not registered")
@@ -206,11 +238,8 @@ class Hub:
 
             if task.trigger == "startup":
                 self.ran_startup_ids.add(task.id)
-
-            elif task.trigger == "interval":
-                if task.interval_seconds is not None:
-                    task.next_run_at = now + timedelta(seconds=task.interval_seconds)
-
+            elif task.trigger == "interval" and task.interval_seconds is not None:
+                task.next_run_at = now + timedelta(seconds=task.interval_seconds)
             elif task.trigger == "once":
                 task.enabled = False
 
@@ -247,11 +276,7 @@ class Hub:
 
         self.tasks = [t for t in self.tasks if t.id != task.id]
         self.task_store.save(self.tasks)
-
-        self.logger.error(
-            "Task %s exceeded max retries and was moved to dead_tasks.json",
-            task.name,
-        )
+        self.logger.error("Task %s exceeded max retries and was moved to dead_tasks.json", task.name)
 
     def submit_and_run_task(self, task: HubTask) -> dict:
         command = task.payload["command"]
@@ -280,6 +305,3 @@ class Hub:
         self.state.save(STATE_FILE)
         self.task_store.save(self.tasks)
         self.logger.info("Hub stopped")
-
-
-

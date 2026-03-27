@@ -1,0 +1,13 @@
+{
+    "tool_id":  "repo_read_file",
+    "name":  "Repo Read File",
+    "description":  "Read a repository file by relative path.",
+    "capability_tags":  [
+                            "repo",
+                            "read"
+                        ],
+    "safety_level":  "low",
+    "implementation_ref":  "agentic_hub.core.repo_tools.RepoTools.read_file",
+    "enabled":  true,
+    "source":  "seed"
+}

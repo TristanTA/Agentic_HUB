@@ -1,0 +1,13 @@
+{
+    "tool_id":  "repo_write_file",
+    "name":  "Repo Write File",
+    "description":  "Create or update a repository file by relative path.",
+    "capability_tags":  [
+                            "repo",
+                            "write"
+                        ],
+    "safety_level":  "high",
+    "implementation_ref":  "agentic_hub.core.repo_tools.RepoTools.write_file",
+    "enabled":  true,
+    "source":  "seed"
+}

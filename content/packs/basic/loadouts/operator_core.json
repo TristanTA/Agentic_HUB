@@ -8,8 +8,26 @@
                              "hub_list_tasks",
                              "hub_list_services",
                              "hub_get_runtime_status",
-                             "hub_request_approval"
+                             "hub_request_approval",
+                             "repo_search_files",
+                             "repo_read_file",
+                             "repo_write_file",
+                             "repo_delete_file",
+                             "repo_show_diff",
+                             "repo_run_checks"
                          ],
+    "tool_policy_overrides":  {
+                                  "repo_write_file":  {
+                                                          "mode":  "allow",
+                                                          "access_level":  "write",
+                                                          "require_approval":  true
+                                                      },
+                                  "repo_delete_file":  {
+                                                           "mode":  "allow",
+                                                           "access_level":  "write",
+                                                           "require_approval":  true
+                                                       }
+                              },
     "tags":  [
                  "operator",
                  "core"

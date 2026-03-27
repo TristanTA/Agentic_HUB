@@ -35,7 +35,7 @@ class DummyHub:
         self.service_manager.register("telegram", DummyService())
         self.event_log = type("EventLog", (), {"list_all": lambda self: []})()
         self.artifact_store = type("ArtifactStore", (), {"list_for_worker": lambda self, worker_id: []})()
-        self.approval_manager = type("ApprovalManager", (), {"list_pending": lambda self: []})()
+        self.approval_manager = DummyApprovalManager()
         repo_root = Path(__file__).resolve().parents[1]
         self._runtime_dir = Path(tempfile.mkdtemp())
         self.catalog_manager = CatalogManager(
@@ -46,6 +46,7 @@ class DummyHub:
         )
         self.catalog_manager.reload_catalog()
         self.telegram_runtime_manager = DummyTelegramManager()
+        self.live_workflow_manager = DummyWorkflowManager()
 
 
 class DummyTelegramManager:
@@ -108,6 +109,58 @@ class DummyTelegramManager:
         target = sessions[0] if worker_id is None else next(session for session in sessions if session.worker_id == worker_id)
         target.messages.append(type("Msg", (), {"role": "user", "content": text})())
         return f"reply from {target.worker_id}: {text}"
+
+
+class DummyWorkflowManager:
+    def __init__(self) -> None:
+        self.items = []
+
+    def start_worker_improvement(self, *, target_worker_id: str, objective: str, requested_by_user_id=None, requested_from_chat_id=None, research_worker_id="nova", operator_worker_id="aria"):
+        workflow = type(
+            "Workflow",
+            (),
+            {
+                "workflow_id": "wf-1",
+                "target_worker_id": target_worker_id,
+                "objective": objective,
+                "status": "awaiting_approval",
+                "approval_id": "approval-1",
+            },
+        )()
+        self.items = [workflow]
+        return workflow
+
+    def list_workflows(self):
+        return self.items
+
+    def inspect_workflow(self, workflow_id: str):
+        return {
+            "workflow_id": workflow_id,
+            "target_worker_id": "aria",
+            "objective": "Improve aria soul",
+            "status": "awaiting_approval",
+            "approval_id": "approval-1",
+            "failure_reason": None,
+            "tasks": [{"task_id": "t1", "kind": "research_request", "status": "done", "summary": "done"}],
+            "artifacts": [{"artifact_id": "a1", "kind": "research_brief", "title": "brief"}],
+        }
+
+    def resume_approved_workflow(self, approval_id: str):
+        return {"message": f"Applied change set for {approval_id}"}
+
+    def reject_workflow(self, approval_id: str, note: str | None = None):
+        return {"message": f"Rejected {approval_id}"}
+
+
+class DummyApprovalManager:
+    def list_pending(self):
+        return []
+
+    def approve(self, approval_id: str, approver_id: str, note: str | None = None):
+        return {"approval_id": approval_id, "approver_id": approver_id, "note": note}
+
+    def reject(self, approval_id: str, approver_id: str, note: str | None = None):
+        return {"approval_id": approval_id, "approver_id": approver_id, "note": note}
 
 
 def test_ping_command() -> None:
@@ -313,5 +366,40 @@ def test_hybrid_chat_commands() -> None:
 
     result = handlers.handle("/chat-close", payload)
     assert result.startswith("Hybrid sessions closed")
+
+
+def test_improve_worker_command() -> None:
+    hub = DummyHub()
+    handlers = CommandHandlers(hub)
+
+    result = handlers.handle("/improve-worker aria improve aria soul", {"user_id": 1, "chat_id": 2})
+
+    assert result.startswith("Worker improvement started")
+    assert "wf-1" in result
+    assert "approval-1" in result
+
+
+def test_workflow_commands() -> None:
+    hub = DummyHub()
+    handlers = CommandHandlers(hub)
+    handlers.handle("/improve-worker aria improve aria soul", {"user_id": 1, "chat_id": 2})
+
+    result = handlers.handle("/workflows", {})
+    assert result.startswith("Live workflows")
+    assert "wf-1" in result
+
+    detail = handlers.handle("/workflow wf-1", {})
+    assert detail.startswith("Workflow details")
+    assert "research_request" in detail
+
+
+def test_approve_command_routes_to_workflow_manager() -> None:
+    hub = DummyHub()
+    handlers = CommandHandlers(hub)
+
+    result = handlers.handle("/approve approval-1 ship it", {"user_id": 99})
+
+    assert result.startswith("Approval recorded")
+    assert "Applied change set" in result
 
 

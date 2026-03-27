@@ -64,6 +64,8 @@ class CommandHandlers:
             return self._runtime()
         if normalized == "/telegram":
             return self._telegram(command)
+        if normalized in {"/approve", "/reject"}:
+            return self._approval_response(command, payload)
         if normalized == "/chat-open":
             return self._chat_open(command, payload)
         if normalized == "/chat-close":
@@ -72,6 +74,12 @@ class CommandHandlers:
             return self._chat(command, payload)
         if normalized == "/chat-sessions":
             return self._chat_sessions(payload)
+        if normalized in {"/improve-worker", "/improve_worker"}:
+            return self._improve_worker(command, payload)
+        if normalized == "/workflows":
+            return self._workflows()
+        if normalized == "/workflow":
+            return self._workflow(command)
         if normalized == "/catalog":
             return self._catalog(command)
         return self._render(f"Unknown command: {normalized or command}", ["Command not recognized."], ["/help", "/status", "/inspect"])
@@ -197,6 +205,7 @@ class CommandHandlers:
                 "/tools, /loadouts, /roles, /types",
                 "/pause, /resume, /retry",
                 "/telegram, /chat-open, /chat, /chat-close, /chat-sessions",
+                "/improve-worker, /workflows, /workflow, /approve, /reject",
                 "Common objects: workers, worker_roles, worker_types, tools, loadouts, tasks",
                 "Example flow: /new -> worker -> answer prompts -> confirm",
             ],
@@ -461,6 +470,86 @@ class CommandHandlers:
         except Exception as exc:
             return self._render("Hybrid chat failed", [str(exc)], ["/chat-open <worker_id>", "/chat-sessions"])
         return self._render("Hybrid reply", [reply], ["/chat <message>", "/chat-close", "/chat-sessions"])
+
+    def _approval_response(self, command: str, payload: dict[str, Any]) -> str:
+        parts = command.split(maxsplit=2)
+        if len(parts) < 2:
+            return self._render("Approval command", ["Usage: /approve <approval_id> [note] or /reject <approval_id> [note]"], ["/workflows"])
+
+        approval_id = parts[1]
+        note = parts[2] if len(parts) > 2 else None
+        approver_id = str(payload.get("user_id", "local"))
+        action = parts[0].lower()
+        try:
+            if action == "/approve":
+                self.hub.approval_manager.approve(approval_id, approver_id=approver_id, note=note)
+                workflow_result = self.hub.live_workflow_manager.resume_approved_workflow(approval_id)
+                return self._render("Approval recorded", [workflow_result["message"]], ["/workflows", "/workflow <id>"])
+            self.hub.approval_manager.reject(approval_id, approver_id=approver_id, note=note)
+            workflow_result = self.hub.live_workflow_manager.reject_workflow(approval_id, note=note)
+            return self._render("Rejection recorded", [workflow_result["message"]], ["/workflows"])
+        except Exception as exc:
+            return self._render("Approval command failed", [str(exc)], ["/workflows", "/logs"])
+
+    def _improve_worker(self, command: str, payload: dict[str, Any]) -> str:
+        parts = command.split(maxsplit=2)
+        if len(parts) < 3:
+            return self._render("Improve worker", ["Usage: /improve-worker <worker_id> <objective>"], ["/workers", "/workflows"])
+        try:
+            workflow = self.hub.live_workflow_manager.start_worker_improvement(
+                target_worker_id=parts[1],
+                objective=parts[2],
+                requested_by_user_id=str(payload.get("user_id")) if payload.get("user_id") is not None else None,
+                requested_from_chat_id=str(payload.get("chat_id")) if payload.get("chat_id") is not None else None,
+            )
+        except Exception as exc:
+            return self._render("Improve worker failed", [str(exc)], ["/workers", "/workflows"])
+
+        body = [
+            f"Workflow: {workflow.workflow_id}",
+            f"Target worker: {workflow.target_worker_id}",
+            f"Status: {workflow.status}",
+        ]
+        if workflow.approval_id:
+            body.append(f"Approval pending: {workflow.approval_id}")
+        return self._render("Worker improvement started", body, [f"/workflow {workflow.workflow_id}", "/workflows"])
+
+    def _workflows(self) -> str:
+        workflows = self.hub.live_workflow_manager.list_workflows()
+        lines = [
+            f"- {workflow.workflow_id} | target={workflow.target_worker_id} | {workflow.status} | approval={workflow.approval_id or '-'}"
+            for workflow in workflows
+        ]
+        return self._render("Live workflows", lines or ["No live workflows recorded."], ["/improve-worker <worker_id> <objective>", "/workflow <id>"])
+
+    def _workflow(self, command: str) -> str:
+        parts = command.split(maxsplit=1)
+        if len(parts) < 2:
+            return self._render("Workflow", ["Usage: /workflow <workflow_id>"], ["/workflows"])
+        try:
+            data = self.hub.live_workflow_manager.inspect_workflow(parts[1])
+        except Exception as exc:
+            return self._render("Workflow lookup failed", [str(exc)], ["/workflows"])
+        body = [
+            f"Workflow: {data['workflow_id']}",
+            f"Target worker: {data['target_worker_id']}",
+            f"Status: {data['status']}",
+            f"Objective: {data['objective']}",
+            f"Approval: {data['approval_id'] or '-'}",
+        ]
+        if data.get("failure_reason"):
+            body.append(f"Failure: {data['failure_reason']}")
+        body.append("Tasks:")
+        body.extend(
+            f"- {task['task_id']} | {task['kind']} | {task['status']} | {task['summary']}"
+            for task in data["tasks"]
+        )
+        body.append("Artifacts:")
+        body.extend(
+            f"- {artifact['artifact_id']} | {artifact['kind']} | {artifact['title']}"
+            for artifact in data["artifacts"]
+        )
+        return self._render("Workflow details", body, ["/workflows", "/approve <approval_id>", "/reject <approval_id>"])
 
     def _resolve_kind(self, raw: str) -> str | None:
         mapping = {"worker": "workers", "workers": "workers", "role": "worker_roles", "roles": "worker_roles", "worker_roles": "worker_roles", "type": "worker_types", "types": "worker_types", "worker_types": "worker_types", "tool": "tools", "tools": "tools", "loadout": "loadouts", "loadouts": "loadouts", "task": "tasks", "tasks": "tasks"}

@@ -5,8 +5,11 @@
     "memory_policy_ref":  "core_memory",
     "allowed_tool_ids":  [
                              "web_search",
+                             "web_fetch_page",
                              "hub_get_runtime_status",
-                             "hub_request_approval"
+                             "hub_request_approval",
+                             "repo_search_files",
+                             "repo_read_file"
                          ],
     "tags":  [
                  "research",

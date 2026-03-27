@@ -1,0 +1,13 @@
+{
+    "tool_id":  "repo_search_files",
+    "name":  "Repo Search Files",
+    "description":  "Search the repository for relevant file paths and matching lines.",
+    "capability_tags":  [
+                            "repo",
+                            "search"
+                        ],
+    "safety_level":  "low",
+    "implementation_ref":  "agentic_hub.core.repo_tools.RepoTools.search_files",
+    "enabled":  true,
+    "source":  "seed"
+}

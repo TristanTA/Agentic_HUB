@@ -1,0 +1,13 @@
+{
+    "tool_id":  "repo_show_diff",
+    "name":  "Repo Show Diff",
+    "description":  "Preview diffs for proposed repository file changes.",
+    "capability_tags":  [
+                            "repo",
+                            "diff"
+                        ],
+    "safety_level":  "low",
+    "implementation_ref":  "agentic_hub.core.repo_tools.RepoTools.preview_diff",
+    "enabled":  true,
+    "source":  "seed"
+}

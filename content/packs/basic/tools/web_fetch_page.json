@@ -1,0 +1,13 @@
+{
+    "tool_id":  "web_fetch_page",
+    "name":  "Web Fetch Page",
+    "description":  "Fetch and clean the contents of a web page for research.",
+    "capability_tags":  [
+                            "web",
+                            "research"
+                        ],
+    "safety_level":  "low",
+    "implementation_ref":  "agentic_hub.core.web_research.WebResearchClient.fetch_page",
+    "enabled":  true,
+    "source":  "seed"
+}
