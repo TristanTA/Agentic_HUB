@@ -51,6 +51,13 @@ class TelegramPollingService:
         if self._running:
             return
         self.client.set_my_commands(self.BOT_COMMANDS)
+        self.logger.info(
+            "Starting telegram polling service: mode=%s worker=%s bot_username=%s allowed_users=%s",
+            self.mode,
+            self.worker_id,
+            self.bot_username,
+            sorted(self.allowed_user_ids),
+        )
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._run_loop, name="telegram-polling", daemon=True)
         self._thread.start()
@@ -85,6 +92,13 @@ class TelegramPollingService:
                     continue
 
                 for update in data.get("result", []):
+                    if self.mode == "managed":
+                        self.logger.info(
+                            "Managed telegram update received: worker=%s update_id=%s keys=%s",
+                            self.worker_id,
+                            update.get("update_id"),
+                            sorted(update.keys()),
+                        )
                     self._offset = update["update_id"] + 1
                     self._handle_update(update)
 
@@ -100,6 +114,12 @@ class TelegramPollingService:
     def _handle_update(self, update: dict[str, Any]) -> None:
         message = update.get("message")
         if not message:
+            if self.mode == "managed":
+                self.logger.info(
+                    "Managed telegram update ignored because it had no message payload: worker=%s update_id=%s",
+                    self.worker_id,
+                    update.get("update_id"),
+                )
             return
 
         from_user = message.get("from", {})
@@ -109,6 +129,16 @@ class TelegramPollingService:
         chat_id = chat.get("id")
         chat_type = chat.get("type", "private")
         text = (message.get("text") or "").strip()
+        if self.mode == "managed":
+            self.logger.info(
+                "Managed telegram message observed: worker=%s chat_id=%s user_id=%s chat_type=%s has_text=%s text=%r",
+                self.worker_id,
+                chat_id,
+                user_id,
+                chat_type,
+                bool(text),
+                text,
+            )
 
         if not text or chat_id is None or user_id is None:
             if self.mode == "managed":
