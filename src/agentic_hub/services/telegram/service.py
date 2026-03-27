@@ -5,6 +5,7 @@ import time
 import uuid
 from typing import Any
 
+from agentic_hub.core.logging import get_logger
 from agentic_hub.core.task_types import HubTask
 from agentic_hub.services.telegram.client import TelegramClient
 
@@ -38,6 +39,7 @@ class TelegramPollingService:
         self.mode = mode
         self.worker_id = worker_id
         self.bot_username = bot_username.lower() if bot_username else None
+        self.logger = get_logger()
 
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -109,12 +111,34 @@ class TelegramPollingService:
         text = (message.get("text") or "").strip()
 
         if not text or chat_id is None or user_id is None:
+            if self.mode == "managed":
+                self.logger.info(
+                    "Managed telegram update ignored before routing: worker=%s chat_id=%s user_id=%s has_text=%s",
+                    self.worker_id,
+                    chat_id,
+                    user_id,
+                    bool(text),
+                )
             return
 
         if is_bot:
+            if self.mode == "managed":
+                self.logger.info(
+                    "Managed telegram update ignored because sender is a bot: worker=%s chat_id=%s user_id=%s",
+                    self.worker_id,
+                    chat_id,
+                    user_id,
+                )
             return
 
         if self.allowed_user_ids and user_id not in self.allowed_user_ids:
+            if self.mode == "managed":
+                self.logger.info(
+                    "Managed telegram update rejected by allowlist: worker=%s chat_id=%s user_id=%s",
+                    self.worker_id,
+                    chat_id,
+                    user_id,
+                )
             self.client.send_message(chat_id, "unauthorized")
             return
 
@@ -160,24 +184,51 @@ class TelegramPollingService:
 
     def _route_managed_message(self, *, text: str, chat_type: str, chat_id: int, user_id: int) -> str | None:
         if self.worker_id is None:
+            self.logger.warning("Managed telegram route missing worker_id for chat_id=%s", chat_id)
             return "managed worker is not configured"
 
         routed_text = text
         if chat_type in {"group", "supergroup"}:
             if not self.bot_username:
+                self.logger.info(
+                    "Managed group message ignored because bot username is missing: worker=%s chat_id=%s",
+                    self.worker_id,
+                    chat_id,
+                )
                 return None
             mention = f"@{self.bot_username}"
             lowered = text.lower()
             if mention not in lowered:
+                self.logger.info(
+                    "Managed group message ignored because mention was missing: worker=%s chat_id=%s expected_mention=%s text=%r",
+                    self.worker_id,
+                    chat_id,
+                    mention,
+                    text,
+                )
                 return None
             start = lowered.index(mention)
             end = start + len(mention)
             routed_text = (text[:start] + text[end:]).strip()
             if not routed_text:
+                self.logger.info(
+                    "Managed group message ignored because mention had no remaining text: worker=%s chat_id=%s mention=%s",
+                    self.worker_id,
+                    chat_id,
+                    mention,
+                )
                 return None
         elif text in {"/start", "/help"}:
             return f"{self.worker_id} is online. Message normally here, or mention this bot in groups."
 
+        self.logger.info(
+            "Managed telegram message routed: worker=%s chat_id=%s user_id=%s chat_type=%s routed_text=%r",
+            self.worker_id,
+            chat_id,
+            user_id,
+            chat_type,
+            routed_text,
+        )
         return self.hub.handle_managed_message(
             worker_id=self.worker_id,
             text=routed_text,
