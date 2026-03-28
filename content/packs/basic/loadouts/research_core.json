@@ -9,6 +9,7 @@
                              "hub_get_runtime_status",
                              "hub_request_approval",
                              "repo_search_files",
+                             "repo_list_directory",
                              "repo_read_file"
                          ],
     "tags":  [

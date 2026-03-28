@@ -75,6 +75,7 @@ class Hub:
                 "startup_task": handlers.startup_task,
                 "start_service_task": lambda payload: handlers.start_service_task(payload, hub=self),
                 "interval_task": handlers.interval_task,
+                "send_scheduled_telegram_reminder": lambda payload: handlers.send_scheduled_telegram_reminder(payload, hub=self),
             },
             logger=self.logger,
         )

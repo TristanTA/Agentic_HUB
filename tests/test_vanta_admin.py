@@ -261,13 +261,13 @@ def test_grant_existing_tool_access_updates_worker_loadout(tmp_path) -> None:
     hub = build_hub(tmp_path)
 
     result = hub.vanta_admin.handle_message(
-        "Give aria access to web_search",
+        "Give aria access to hub_list_services",
         {"source": "telegram", "chat_id": 8, "user_id": 9},
     )
 
-    assert "Granted `aria` access to tool `web_search`" in result
+    assert "Granted `aria` access to tool `hub_list_services`" in result
     loadout = hub.worker_registry.get_loadout(hub.worker_registry.get_worker("aria").loadout_id)
-    assert "web_search" in loadout.allowed_tool_ids
+    assert "hub_list_services" in loadout.allowed_tool_ids
 
 
 def test_grant_unknown_model_access_requests_code_change_approval(tmp_path) -> None:
@@ -293,6 +293,8 @@ def test_worker_tool_question_inspects_loadout_instead_of_mutating(tmp_path) -> 
     assert "inspecting the worker -> loadout -> allowed tools chain" in result.lower()
     assert "Worker `aria` uses loadout `aria_band_core`." in result
     assert "`telegram_send_message`" in result
+    assert "`schedule_telegram_reminder`" in result
+    assert "`web_search`" in result
     assert "Approval required before changing executable code" not in result
 
 
@@ -349,13 +351,13 @@ def test_existing_tool_grant_uses_operator_preview(tmp_path) -> None:
     hub = build_hub(tmp_path)
 
     result = hub.vanta_admin.handle_message(
-        "Give aria access to web_search",
+        "Give aria access to hub_list_services",
         {"source": "telegram", "chat_id": 48, "user_id": 49},
     )
 
     assert "I checked `aria`." in result
-    assert "does not currently allow `web_search`" in result
-    assert "Granted `aria` access to tool `web_search`" in result
+    assert "does not currently allow `hub_list_services`" in result
+    assert "Granted `aria` access to tool `hub_list_services`" in result
 
 
 def test_approval_gated_capability_request_explains_diagnosis(tmp_path) -> None:
@@ -393,7 +395,8 @@ def test_worker_scope_follow_up_stays_helpful(tmp_path) -> None:
     )
 
     assert "telegram_send_message" in result
-    assert "isn't just" in result.lower() or "isn't the whole picture" in result.lower() or "not the whole picture" in result.lower()
+    assert "schedule_telegram_reminder" in result
+    assert "isn't just" in result.lower() or "isn't the whole picture" in result.lower() or "not the whole picture" in result.lower() or "not limited to telegram replies" in result.lower()
     assert "Tell me what you want to inspect or change in the hub" not in result
 
 
@@ -408,6 +411,7 @@ def test_tool_inventory_question_lists_all_tools(tmp_path) -> None:
     assert "telegram_send_message" in result
     assert "web_search" in result
     assert "repo_read_file" in result
+    assert "schedule_telegram_reminder" in result
     assert "Tell me what you want to inspect or change in the hub" not in result
 
 
@@ -422,6 +426,34 @@ def test_worker_mention_without_exact_route_still_uses_repo_grounded_summary(tmp
     assert "live registry and repo-backed catalog" in result
     assert "aria_band_core" in result
     assert "telegram_send_message" in result
+    assert "schedule_telegram_reminder" in result
+
+
+def test_broad_catalog_follow_up_stays_broad_even_with_worker_mention(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "That will not work for aria. What tools do we have as a whole? What all is in the catalog?",
+        {"source": "telegram", "chat_id": 70, "user_id": 71},
+    )
+
+    assert "live catalog as a whole" in result
+    assert "Tools (" in result
+    assert "Loadouts (" in result
+    assert "schedule_telegram_reminder" in result
+
+
+def test_tool_recommendation_request_returns_practical_additions(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "Have nova research what tools aria should use",
+        {"source": "telegram", "chat_id": 72, "user_id": 73},
+    )
+
+    assert "current catalog" in result.lower()
+    assert "aria" in result.lower()
+    assert "hub_list_services" in result
 
 
 def test_unmatched_admin_question_uses_repo_search_instead_of_generic_fallback(tmp_path) -> None:

@@ -13,8 +13,24 @@
                    ],
     "memory_policy_ref":  "core_memory",
     "allowed_tool_ids":  [
-                             "telegram_send_message"
+                             "telegram_send_message",
+                             "schedule_telegram_reminder",
+                             "web_search",
+                             "web_fetch_page",
+                             "repo_search_files",
+                             "repo_list_directory",
+                             "repo_read_file",
+                             "repo_write_file",
+                             "hub_list_tasks",
+                             "hub_get_runtime_status"
                          ],
+    "tool_policy_overrides":  {
+                                  "repo_write_file":  {
+                                                          "mode":  "allow",
+                                                          "access_level":  "write",
+                                                          "require_approval":  true
+                                                      }
+                              },
     "tags":  [
                  "aria",
                  "music",

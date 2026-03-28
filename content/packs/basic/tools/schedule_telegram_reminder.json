@@ -1,0 +1,14 @@
+{
+    "tool_id":  "schedule_telegram_reminder",
+    "name":  "Schedule Telegram Reminder",
+    "description":  "Create a recurring scheduled Telegram reminder task for a worker and destination chat.",
+    "capability_tags":  [
+                            "telegram",
+                            "reminder",
+                            "schedule"
+                        ],
+    "safety_level":  "medium",
+    "implementation_ref":  "agentic_hub.core.reminder_tools.schedule_telegram_reminder",
+    "enabled":  true,
+    "source":  "seed"
+}

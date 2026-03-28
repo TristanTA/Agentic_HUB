@@ -10,11 +10,15 @@
                              "hub_get_runtime_status",
                              "hub_request_approval",
                              "repo_search_files",
+                             "repo_list_directory",
                              "repo_read_file",
                              "repo_write_file",
                              "repo_delete_file",
                              "repo_show_diff",
-                             "repo_run_checks"
+                             "repo_run_checks",
+                             "schedule_telegram_reminder",
+                             "web_search",
+                             "web_fetch_page"
                          ],
     "tool_policy_overrides":  {
                                   "repo_write_file":  {

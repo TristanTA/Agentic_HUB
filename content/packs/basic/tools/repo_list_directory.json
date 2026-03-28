@@ -1,0 +1,14 @@
+{
+    "tool_id":  "repo_list_directory",
+    "name":  "Repo List Directory",
+    "description":  "List files and folders within the repository by relative path.",
+    "capability_tags":  [
+                            "repo",
+                            "list",
+                            "read"
+                        ],
+    "safety_level":  "low",
+    "implementation_ref":  "agentic_hub.core.repo_tools.RepoTools.list_directory",
+    "enabled":  true,
+    "source":  "seed"
+}

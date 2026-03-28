@@ -221,6 +221,8 @@ class VantaAdminAgent:
             return self._execute_actions([AdminAction(kind="list_objects", params={"kind": "tasks"}, summary="List tasks")])
         if self._is_service_listing_request(lowered):
             return self._execute_actions([AdminAction(kind="list_services", params={}, summary="List services")])
+        if self._is_catalog_inventory_request(lowered):
+            return self._catalog_inventory_response(detail_level)
         if self._is_tool_listing_request(lowered):
             return self._tool_inventory_response(detail_level)
         if self._is_skill_listing_request(lowered):
@@ -232,6 +234,8 @@ class VantaAdminAgent:
         if target is not None:
             return self._execute_actions([AdminAction(kind="inspect_status", params={"target": target}, summary=f"Inspect {target}")])
 
+        if worker_id is not None and self._is_tool_recommendation_request(lowered):
+            return self._recommended_tools_response(worker_id, detail_level, request)
         if worker_id is not None and self._is_worker_tools_question(lowered):
             return self._worker_tools_response(worker_id, detail_level)
         if worker_id is not None and self._is_worker_context_question(lowered):
@@ -584,7 +588,11 @@ class VantaAdminAgent:
                 f"`{worker_id}` only has one runtime tool right now: `telegram_send_message`. "
                 f"But they still have role, prompt, and skill context beyond that, so this is not the whole picture."
             )
-        return f"`{worker_id}` has {len(tool_ids)} runtime tool{'s' if len(tool_ids) != 1 else ''} right now, plus role, prompt, and skill context."
+        sample = ", ".join(f"`{tool_id}`" for tool_id in tool_ids[:6])
+        return (
+            f"`{worker_id}` has {len(tool_ids)} runtime tool{'s' if len(tool_ids) != 1 else ''} right now. "
+            f"That includes {sample}, so they are not limited to Telegram replies."
+        )
 
     def _worker_repo_summary(self, worker_id: str, detail_level: str) -> str:
         worker = self.hub.worker_registry.get_worker(worker_id)
@@ -606,6 +614,59 @@ class VantaAdminAgent:
             return "I checked the live tool registry and these tools are currently available:\n" + "\n".join(rows)
         rows = ", ".join(f"`{tool.tool_id}`" for tool in tools[:15])
         return f"I checked the live tool registry. Available tools include {rows}."
+
+    def _catalog_inventory_response(self, detail_level: str) -> str:
+        workers = sorted(self.hub.worker_registry.list_workers(), key=lambda item: item.worker_id)
+        loadouts = sorted(self.hub.worker_registry.list_loadouts(), key=lambda item: item.loadout_id)
+        tools = sorted(self.hub.tool_registry.list_all(), key=lambda item: item.tool_id)
+        if detail_level == "technical":
+            worker_rows = ", ".join(f"`{worker.worker_id}`" for worker in workers[:8]) or "none"
+            loadout_rows = ", ".join(f"`{loadout.loadout_id}`" for loadout in loadouts[:8]) or "none"
+            tool_rows = ", ".join(f"`{tool.tool_id}`" for tool in tools[:20]) or "none"
+            return (
+                "I checked the live catalog as a whole.\n\n"
+                f"Workers ({len(workers)}): {worker_rows}\n"
+                f"Loadouts ({len(loadouts)}): {loadout_rows}\n"
+                f"Tools ({len(tools)}): {tool_rows}"
+            )
+        return (
+            f"I checked the live catalog as a whole. Right now I can see {len(workers)} workers, "
+            f"{len(loadouts)} loadouts, and {len(tools)} tools."
+        )
+
+    def _recommended_tools_response(self, worker_id: str, detail_level: str, request: str) -> str:
+        worker = self.hub.worker_registry.get_worker(worker_id)
+        loadout = self.hub.worker_registry.get_loadout(worker.loadout_id)
+        current = list(loadout.allowed_tool_ids)
+        recommended = [
+            tool_id
+            for tool_id in (
+                "telegram_send_message",
+                "schedule_telegram_reminder",
+                "web_search",
+                "web_fetch_page",
+                "repo_search_files",
+                "repo_read_file",
+                "repo_write_file",
+                "repo_list_directory",
+                "hub_list_tasks",
+                "hub_list_services",
+                "hub_get_runtime_status",
+            )
+            if self._tool_exists(tool_id)
+        ]
+        missing = [tool_id for tool_id in recommended if tool_id not in current]
+        intro = "I checked the current catalog and Aria's actual loadout." if "nova" in request.lower() else f"I checked `{worker_id}` against the current catalog."
+        if detail_level == "technical":
+            current_text = ", ".join(f"`{tool_id}`" for tool_id in current) or "none"
+            missing_text = ", ".join(f"`{tool_id}`" for tool_id in missing) or "no additions needed"
+            return (
+                f"{intro}\n\n"
+                f"Current tools: {current_text}\n"
+                f"Recommended additions: {missing_text}"
+            )
+        missing_text = ", ".join(f"`{tool_id}`" for tool_id in missing[:6]) or "no additions right now"
+        return f"{intro} The best next tool additions for `{worker_id}` look like {missing_text}."
 
     def _delegation_response(self) -> str:
         worker_ids = [worker.worker_id for worker in self.hub.worker_registry.list_workers() if worker.worker_id in {"forge", "nova"}]
@@ -769,6 +830,13 @@ class VantaAdminAgent:
                 return tool.tool_id
         return None
 
+    def _tool_exists(self, tool_id: str) -> bool:
+        try:
+            self.hub.tool_registry.get(tool_id)
+        except KeyError:
+            return False
+        return True
+
     def _is_worker_tools_question(self, lowered: str) -> bool:
         return "tool" in lowered and any(phrase in lowered for phrase in {"what tools", "which tools", "tools does", "tool access", "allowed tools"})
 
@@ -779,7 +847,7 @@ class VantaAdminAgent:
         return any(phrase in lowered for phrase in {"that's it", "thats it", "that it", "only respond", "only use telegram", "only on telegram", "is that it"})
 
     def _is_tool_listing_request(self, lowered: str) -> bool:
-        return any(phrase in lowered for phrase in {"list tools", "show tools", "what tools are available", "what are all the tools", "all the tools available", "inspect all tools", "available tools"})
+        return any(phrase in lowered for phrase in {"list tools", "show tools", "what tools are available", "what are all the tools", "all the tools available", "inspect all tools", "available tools", "tools do we have", "tools we have as a whole"})
 
     def _is_worker_listing_request(self, lowered: str) -> bool:
         return any(phrase in lowered for phrase in {"list workers", "show workers", "what are the workers", "which workers", "workers do we have"})
@@ -796,6 +864,9 @@ class VantaAdminAgent:
     def _is_skill_review_request(self, lowered: str) -> bool:
         return "review skills" in lowered or "skill review" in lowered
 
+    def _is_catalog_inventory_request(self, lowered: str) -> bool:
+        return "catalog" in lowered and any(word in lowered for word in {"what", "show", "inspect", "all", "whole"})
+
     def _is_hub_status_request(self, lowered: str) -> bool:
         return any(phrase in lowered for phrase in {"hub status", "status of the hub", "what is the status of the hub", "what is the status of hub", "show hub status"})
 
@@ -806,6 +877,12 @@ class VantaAdminAgent:
 
     def _looks_like_capability_question(self, lowered: str, worker_id: str) -> bool:
         return any(prefix in lowered for prefix in {f"can {worker_id}", f"could {worker_id}", f"is {worker_id} able to"})
+
+    def _is_tool_recommendation_request(self, lowered: str) -> bool:
+        return "tool" in lowered and any(
+            phrase in lowered
+            for phrase in {"should use", "should have", "would need", "needs more than that", "what should use"}
+        )
 
     def _is_delegation_question(self, lowered: str) -> bool:
         return ("vanta" in lowered or "you" in lowered) and any(word in lowered for word in {"delegate", "delegation", "call", "lean on", "use to help"})
