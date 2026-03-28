@@ -188,7 +188,7 @@ def test_reminder_request_behaves_like_operator_not_capability_dump(tmp_path) ->
     )
 
     assert "scheduled reminders" in first.lower()
-    assert "What schedule should Aria use" in first
+    assert "What schedule should" in first
     assert "Default capabilities:" not in first
 
     second = hub.vanta_admin.handle_message(
@@ -196,7 +196,7 @@ def test_reminder_request_behaves_like_operator_not_capability_dump(tmp_path) ->
         {"source": "telegram", "chat_id": 11, "user_id": 12},
     )
 
-    assert "Where should Aria send those reminders?" in second
+    assert "Where should those reminders" in second
 
     third = hub.vanta_admin.handle_message(
         "to the band group chat",
@@ -280,3 +280,105 @@ def test_grant_unknown_model_access_requests_code_change_approval(tmp_path) -> N
 
     assert "Approval required before changing executable code" in result
     assert "google nano-banana" in result.lower()
+
+
+def test_worker_tool_question_inspects_loadout_instead_of_mutating(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "What tools does aria have access to?",
+        {"source": "telegram", "chat_id": 40, "user_id": 41},
+    )
+
+    assert "inspecting the worker -> loadout -> allowed tools chain" in result.lower()
+    assert "Worker `aria` uses loadout `aria_band_core`." in result
+    assert "`telegram_send_message`" in result
+    assert "Approval required before changing executable code" not in result
+
+
+def test_cancel_clears_pending_operator_flow(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    first = hub.vanta_admin.handle_message(
+        "Hey Vanta, I want to give Aria the ability to send reminders out on a schedule.",
+        {"source": "telegram", "chat_id": 42, "user_id": 43},
+    )
+    cancelled = hub.vanta_admin.handle_message(
+        "cancel",
+        {"source": "telegram", "chat_id": 42, "user_id": 43},
+    )
+    fresh = hub.vanta_admin.handle_message(
+        "what tools does aria have access to?",
+        {"source": "telegram", "chat_id": 42, "user_id": 43},
+    )
+
+    assert "schedule" in first.lower()
+    assert "Cancelled that pending flow" in cancelled
+    assert "Worker `aria` uses loadout `aria_band_core`." in fresh
+
+
+def test_topic_switch_starts_fresh_request_during_pending_flow(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    hub.vanta_admin.handle_message(
+        "Create a new tool named Banana Logger",
+        {"source": "telegram", "chat_id": 44, "user_id": 45},
+    )
+    result = hub.vanta_admin.handle_message(
+        "what tools does aria have access to?",
+        {"source": "telegram", "chat_id": 44, "user_id": 45},
+    )
+
+    assert "Cancelled the previous flow and started fresh." in result
+    assert "Worker `aria` uses loadout `aria_band_core`." in result
+
+
+def test_concise_capability_question_stays_high_level(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "Can aria help with band support?",
+        {"source": "telegram", "chat_id": 46, "user_id": 47},
+    )
+
+    assert "looks like something they can already handle" in result
+    assert "loadout" not in result.lower()
+
+
+def test_existing_tool_grant_uses_operator_preview(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "Give aria access to web_search",
+        {"source": "telegram", "chat_id": 48, "user_id": 49},
+    )
+
+    assert "I checked `aria`." in result
+    assert "does not currently allow `web_search`" in result
+    assert "Granted `aria` access to tool `web_search`" in result
+
+
+def test_approval_gated_capability_request_explains_diagnosis(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "Can we give aria the ability to access Google's nano-banana model?",
+        {"source": "telegram", "chat_id": 50, "user_id": 51},
+    )
+
+    assert "runtime path" in result
+    assert "implementation proposal" in result
+    assert "Approval required before changing executable code" in result
+
+
+def test_vanta_can_inspect_delegation_options(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "Who can Vanta delegate to for implementation help?",
+        {"source": "telegram", "chat_id": 52, "user_id": 53},
+    )
+
+    assert "Vanta can lean on these workers" in result
+    assert "`forge`" in result
+    assert "`nova`" in result

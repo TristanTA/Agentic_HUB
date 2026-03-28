@@ -59,6 +59,9 @@ class AdminExecutor:
             "update_worker": self._update_worker,
             "create_loadout": self._create_loadout,
             "create_tool": self._create_tool,
+            "inspect_worker_tools": self._inspect_worker_tools,
+            "inspect_worker_context": self._inspect_worker_context,
+            "inspect_worker_delegation": self._inspect_worker_delegation,
             "grant_tool_access": self._grant_tool_access,
             "attach_managed_bot": self._attach_managed_bot,
             "propose_skill": self._propose_skill,
@@ -186,6 +189,74 @@ class AdminExecutor:
             summary=f"Created tool `{tool_id}`.",
             changed_ids=[tool_id],
             validation_results=[f"tool `{tool_id}` is available in the active registry"],
+        )
+
+    def _inspect_worker_tools(self, action: AdminAction) -> AdminActionResult:
+        worker_id = str(action.params["worker_id"])
+        detail_level = str(action.params.get("detail_level", "concise"))
+        worker = self.hub.worker_registry.get_worker(worker_id)
+        loadout = self.hub.worker_registry.get_loadout(worker.loadout_id)
+        tool_ids = list(loadout.allowed_tool_ids)
+        if detail_level == "technical":
+            rows = ", ".join(f"`{tool_id}`" for tool_id in tool_ids) if tool_ids else "no allowed tools"
+            summary = (
+                f"Worker `{worker.worker_id}` uses loadout `{loadout.loadout_id}`. "
+                f"Allowed tools: {rows}."
+            )
+        else:
+            if tool_ids:
+                rows = ", ".join(f"`{tool_id}`" for tool_id in tool_ids)
+                summary = f"`{worker.worker_id}` can currently use {rows}."
+            else:
+                summary = f"`{worker.worker_id}` does not currently have any allowed tools."
+        return AdminActionResult(
+            kind=action.kind,
+            status="completed",
+            summary=summary,
+            changed_ids=[worker.worker_id, loadout.loadout_id, *tool_ids],
+            validation_results=[f"loadout `{loadout.loadout_id}` inspected"],
+        )
+
+    def _inspect_worker_context(self, action: AdminAction) -> AdminActionResult:
+        worker_id = str(action.params["worker_id"])
+        detail_level = str(action.params.get("detail_level", "concise"))
+        worker = self.hub.worker_registry.get_worker(worker_id)
+        role = self.hub.worker_registry.get_role(worker.role_id)
+        loadout = self.hub.worker_registry.get_loadout(worker.loadout_id)
+        prompt_count = len(loadout.prompt_refs)
+        skill_count = len(loadout.skill_refs)
+        tool_count = len(loadout.allowed_tool_ids)
+        if detail_level == "technical":
+            summary = (
+                f"Worker `{worker.worker_id}` | role=`{role.role_id}` | loadout=`{loadout.loadout_id}` | "
+                f"interface=`{worker.interface_mode}` | prompts={prompt_count} | skills={skill_count} | tools={tool_count}"
+            )
+        else:
+            summary = (
+                f"`{worker.worker_id}` is set up as {role.name.lower()} with {tool_count} tool"
+                f"{'' if tool_count == 1 else 's'}, {skill_count} skill"
+                f"{'' if skill_count == 1 else 's'}, and {prompt_count} prompt context file"
+                f"{'' if prompt_count == 1 else 's'}."
+            )
+        return AdminActionResult(
+            kind=action.kind,
+            status="completed",
+            summary=summary,
+            changed_ids=[worker.worker_id, loadout.loadout_id, role.role_id],
+        )
+
+    def _inspect_worker_delegation(self, action: AdminAction) -> AdminActionResult:
+        preferred_ids = [worker.worker_id for worker in self.hub.worker_registry.list_workers() if worker.worker_id in {"forge", "nova"}]
+        candidate_ids = preferred_ids or [worker.worker_id for worker in self.hub.worker_registry.list_workers() if worker.worker_id != "vanta"]
+        if candidate_ids:
+            summary = "Vanta can lean on these workers for support: " + ", ".join(f"`{worker_id}`" for worker_id in candidate_ids) + "."
+        else:
+            summary = "No additional workers are currently available for Vanta to delegate to."
+        return AdminActionResult(
+            kind=action.kind,
+            status="completed",
+            summary=summary,
+            changed_ids=candidate_ids,
         )
 
     def _grant_tool_access(self, action: AdminAction) -> AdminActionResult:
