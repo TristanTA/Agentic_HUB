@@ -382,3 +382,55 @@ def test_vanta_can_inspect_delegation_options(tmp_path) -> None:
     assert "Vanta can lean on these workers" in result
     assert "`forge`" in result
     assert "`nova`" in result
+
+
+def test_worker_scope_follow_up_stays_helpful(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "aria can only respond on telegram? thats it?",
+        {"source": "telegram", "chat_id": 60, "user_id": 61},
+    )
+
+    assert "telegram_send_message" in result
+    assert "isn't just" in result.lower() or "isn't the whole picture" in result.lower() or "not the whole picture" in result.lower()
+    assert "Tell me what you want to inspect or change in the hub" not in result
+
+
+def test_tool_inventory_question_lists_all_tools(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "What are all the tools currently available?",
+        {"source": "telegram", "chat_id": 62, "user_id": 63},
+    )
+
+    assert "telegram_send_message" in result
+    assert "web_search" in result
+    assert "repo_read_file" in result
+    assert "Tell me what you want to inspect or change in the hub" not in result
+
+
+def test_worker_mention_without_exact_route_still_uses_repo_grounded_summary(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "Give me the repo-backed summary for aria",
+        {"source": "telegram", "chat_id": 64, "user_id": 65},
+    )
+
+    assert "live registry and repo-backed catalog" in result
+    assert "aria_band_core" in result
+    assert "telegram_send_message" in result
+
+
+def test_unmatched_admin_question_uses_repo_search_instead_of_generic_fallback(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "Where is aria's soul file defined?",
+        {"source": "telegram", "chat_id": 66, "user_id": 67},
+    )
+
+    assert "worker_docs/aria/soul.md" in result or "aria.json" in result
+    assert "Tell me what you want to inspect or change in the hub" not in result
