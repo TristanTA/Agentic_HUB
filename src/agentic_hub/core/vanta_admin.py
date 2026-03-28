@@ -3,18 +3,20 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import requests
 
 from agentic_hub.core.admin_executor import AdminExecutor
-from agentic_hub.models.admin_action import AdminAction, AdminActionKind, AdminExecutionResult, VantaPlan
+from agentic_hub.models.admin_action import AdminAction, AdminActionKind, AdminExecutionResult
+from agentic_hub.models.operator_plan import OperatorFollowUpState, OperatorGoalPlan, OperatorPlanStep
 from agentic_hub.models.vanta_capability import VantaCapability
 
 
 TOKEN_PATTERN = re.compile(r"\b\d{5,}:[A-Za-z0-9_-]+\b")
 CREATE_WORDS = {"create", "make", "new", "add", "build"}
+READ_ONLY_COMMANDS = {"help", "status", "workers", "tasks", "inspect", "logs"}
 
 
 @dataclass(frozen=True)
@@ -28,130 +30,29 @@ class VantaSystemConfig:
 
 @dataclass
 class PendingAdminRequest:
-    session_type: Literal["field_collection", "skill_approval"]
-    pending_action_kind: AdminActionKind | Literal["skill_approval"]
-    original_text: str
-    draft: dict[str, Any] = field(default_factory=dict)
-    required_fields: list[str] = field(default_factory=list)
+    session_type: Literal["operator_follow_up", "skill_approval"]
+    state: OperatorFollowUpState | None = None
+    skill_id: str | None = None
+    target_loadout_ids: list[str] | None = None
 
 
 class VantaAdminAgent:
     SYSTEM_CONFIG = VantaSystemConfig()
     _CAPABILITIES: tuple[VantaCapability, ...] = (
-        VantaCapability(
-            capability_id="inspect_hub_status",
-            label="inspect hub status",
-            summary="Read overall hub health and counts.",
-            action_kind="inspect_status",
-            access="read",
-            required_argument_names=["target"],
-        ),
-        VantaCapability(
-            capability_id="list_workers",
-            label="list workers",
-            summary="Read worker inventory and interface modes.",
-            action_kind="list_objects",
-            access="read",
-            required_argument_names=["kind"],
-        ),
-        VantaCapability(
-            capability_id="list_tasks",
-            label="list tasks",
-            summary="Read scheduled task inventory.",
-            action_kind="list_objects",
-            access="read",
-            required_argument_names=["kind"],
-        ),
-        VantaCapability(
-            capability_id="list_services",
-            label="list services",
-            summary="Read registered services and states.",
-            action_kind="list_services",
-            access="read",
-        ),
-        VantaCapability(
-            capability_id="inspect_logs",
-            label="inspect logs",
-            summary="Point users to slash-command log inspection.",
-            access="read",
-        ),
-        VantaCapability(
-            capability_id="create_worker",
-            label="create worker",
-            summary="Create an internal or managed worker in runtime overrides and validate it.",
-            action_kind="create_worker",
-            access="mutating",
-            required_argument_names=["worker_id", "name", "type_id", "role_id", "loadout_id", "interface_mode"],
-        ),
-        VantaCapability(
-            capability_id="create_loadout",
-            label="create loadout",
-            summary="Create a runtime loadout with tools and policies.",
-            action_kind="create_loadout",
-            access="mutating",
-            required_argument_names=["loadout_id", "name"],
-        ),
-        VantaCapability(
-            capability_id="create_tool",
-            label="create tool",
-            summary="Create a runtime tool definition for the hub catalog.",
-            action_kind="create_tool",
-            access="mutating",
-            required_argument_names=["tool_id", "name", "description", "implementation_ref"],
-        ),
-        VantaCapability(
-            capability_id="grant_tool_access",
-            label="grant tool access",
-            summary="Grant an existing tool to a worker by updating its loadout.",
-            action_kind="grant_tool_access",
-            access="mutating",
-            required_argument_names=["worker_id", "tool_id"],
-        ),
-        VantaCapability(
-            capability_id="attach_managed_bot",
-            label="attach managed bot",
-            summary="Attach a Telegram bot token to an existing managed worker.",
-            action_kind="attach_managed_bot",
-            access="mutating",
-            required_argument_names=["worker_id", "bot_token"],
-        ),
-        VantaCapability(
-            capability_id="review_skills",
-            label="review skills",
-            summary="Generate a monthly skill review report.",
-            action_kind="review_skills",
-            access="read",
-        ),
-        VantaCapability(
-            capability_id="request_code_change",
-            label="request code change",
-            summary="Draft an approval-gated repo change proposal.",
-            action_kind="request_code_change",
-            access="mutating",
-            required_argument_names=["request_summary"],
-            escalation_pack="repo",
-        ),
-        VantaCapability(
-            capability_id="repo_context",
-            label="repo context",
-            summary="Fetch repo-oriented capability details when a task requires code changes.",
-            access="read",
-            escalation_pack="repo",
-        ),
-        VantaCapability(
-            capability_id="web_context",
-            label="web context",
-            summary="Fetch web-oriented capability details when a task requires external research.",
-            access="read",
-            escalation_pack="web",
-        ),
-        VantaCapability(
-            capability_id="operator_context",
-            label="operator context",
-            summary="Fetch broader operator capability details for privileged workflows.",
-            access="read",
-            escalation_pack="operator",
-        ),
+        VantaCapability(capability_id="inspect_hub_status", label="inspect hub status", summary="Read overall hub health and counts.", action_kind="inspect_status", access="read", required_argument_names=["target"]),
+        VantaCapability(capability_id="list_workers", label="list workers", summary="Read worker inventory and interface modes.", action_kind="list_objects", access="read", required_argument_names=["kind"]),
+        VantaCapability(capability_id="list_tasks", label="list tasks", summary="Read scheduled task inventory.", action_kind="list_objects", access="read", required_argument_names=["kind"]),
+        VantaCapability(capability_id="list_services", label="list services", summary="Read registered services and states.", action_kind="list_services", access="read"),
+        VantaCapability(capability_id="inspect_logs", label="inspect logs", summary="Review recent operational logs.", action_kind=None, access="read"),
+        VantaCapability(capability_id="create_worker", label="create worker", summary="Create an internal or managed worker in runtime overrides and validate it.", action_kind="create_worker", access="mutating", required_argument_names=["worker_id", "name", "type_id", "role_id", "loadout_id", "interface_mode"]),
+        VantaCapability(capability_id="create_tool", label="create tool", summary="Create a runtime tool definition for the hub catalog.", action_kind="create_tool", access="mutating", required_argument_names=["tool_id", "name", "description", "implementation_ref"]),
+        VantaCapability(capability_id="grant_tool_access", label="grant tool access", summary="Grant an existing tool to a worker by updating its loadout.", action_kind="grant_tool_access", access="mutating", required_argument_names=["worker_id", "tool_id"]),
+        VantaCapability(capability_id="attach_managed_bot", label="attach managed bot", summary="Attach a Telegram bot token to an existing managed worker.", action_kind="attach_managed_bot", access="mutating", required_argument_names=["worker_id", "bot_token"]),
+        VantaCapability(capability_id="review_skills", label="review skills", summary="Generate a monthly skill review report.", action_kind="review_skills", access="read"),
+        VantaCapability(capability_id="request_code_change", label="request code change", summary="Draft an approval-gated repo change proposal.", action_kind="request_code_change", access="mutating", required_argument_names=["request_summary"], escalation_pack="repo"),
+        VantaCapability(capability_id="repo_context", label="repo context", summary="Fetch repo-oriented capability details when a task requires code changes.", action_kind=None, access="read", escalation_pack="repo"),
+        VantaCapability(capability_id="web_context", label="web context", summary="Fetch web-oriented capability details when a task requires external research.", action_kind=None, access="read", escalation_pack="web"),
+        VantaCapability(capability_id="operator_context", label="operator context", summary="Fetch broader operator capability details for privileged workflows.", action_kind=None, access="read", escalation_pack="operator"),
     )
 
     def __init__(self, hub: Any) -> None:
@@ -170,7 +71,7 @@ class VantaAdminAgent:
         requested = set(packs or list(self.SYSTEM_CONFIG.default_packs))
         if not requested:
             requested = set(self.SYSTEM_CONFIG.default_packs)
-        capabilities = [capability for capability in self._CAPABILITIES if capability.escalation_pack in requested]
+        capabilities = [item for item in self._CAPABILITIES if item.escalation_pack in requested]
         return sorted(capabilities, key=lambda item: (item.escalation_pack, item.capability_id))
 
     def handle_message(self, text: str, payload: dict[str, Any]) -> str:
@@ -178,110 +79,64 @@ class VantaAdminAgent:
         if session_key in self._sessions:
             return self._continue_session(session_key, text)
 
-        plan = self._cheap_route(text)
-        if plan is None:
-            plan = self._plan_request(text)
+        read_plan = self._cheap_route(text)
+        if read_plan is not None:
+            return self._execute_goal_plan(read_plan, session_key)
 
-        if plan.follow_up_question and plan.follow_up_field and plan.pending_action_kind:
-            self._sessions[session_key] = PendingAdminRequest(
-                session_type="field_collection",
-                pending_action_kind=plan.pending_action_kind,
-                original_text=text,
-                draft=self._seed_draft(text, plan.pending_action_kind),
-                required_fields=[plan.follow_up_field],
-            )
-            return plan.follow_up_question
-
-        if not plan.actions:
-            return plan.reply or self._fallback_reply()
-
-        result = self.executor.execute(plan.actions)
-        response = self._render_execution_result(result)
-        return self._maybe_begin_skill_approval_session(session_key, plan.actions, result, response)
+        operator_plan = self._build_operator_goal_plan(text)
+        return self._execute_goal_plan(operator_plan, session_key)
 
     def _continue_session(self, session_key: str, answer: str) -> str:
         session = self._sessions[session_key]
         if session.session_type == "skill_approval":
+            skill_id = str(session.skill_id)
+            loadout_ids = list(session.target_loadout_ids or [])
             decision = answer.strip().lower()
-            skill_id = str(session.draft["skill_id"])
-            loadout_ids = list(session.draft.get("target_loadout_ids", []))
             del self._sessions[session_key]
             if decision in {"approve", "approved", "yes", "y"}:
-                result = self.executor.execute(
-                    [AdminAction(kind="approve_skill", params={"skill_id": skill_id, "loadout_ids": loadout_ids}, summary=f"Approve skill {skill_id}")]
-                )
+                result = self.executor.execute([AdminAction(kind="approve_skill", params={"skill_id": skill_id, "loadout_ids": loadout_ids}, summary=f"Approve skill {skill_id}")])
                 return self._render_execution_result(result)
             if decision in {"reject", "rejected", "no", "n"}:
-                result = self.executor.execute(
-                    [AdminAction(kind="reject_skill", params={"skill_id": skill_id}, summary=f"Reject skill {skill_id}")]
-                )
+                result = self.executor.execute([AdminAction(kind="reject_skill", params={"skill_id": skill_id}, summary=f"Reject skill {skill_id}")])
                 return self._render_execution_result(result)
             self._sessions[session_key] = session
             return "Please reply `approve` or `reject` for this skill proposal."
 
-        if not session.required_fields:
+        if session.state is None:
             del self._sessions[session_key]
-            return "I lost the admin context for that request. Please send it again."
+            return "I lost the operator context for that request. Please send it again."
 
-        current_field = session.required_fields.pop(0)
-        session.draft[current_field] = self._normalize_field(session.pending_action_kind, current_field, answer)
+        state = session.state
+        if state.unresolved_questions:
+            field_name = state.unresolved_questions.pop(0)
+            state.accumulated_answers[field_name] = answer.strip()
 
-        follow_up = self._missing_field(session.pending_action_kind, session.draft)
-        if follow_up:
-            session.required_fields = [follow_up]
-            return self._follow_up_question(session.pending_action_kind, follow_up, session.draft)
+        resumed_plan = self._resume_operator_goal(state)
+        if resumed_plan.missing_essentials:
+            state.unresolved_questions = list(resumed_plan.missing_essentials)
+            state.user_response_prefix = resumed_plan.user_response
+            self._sessions[session_key] = PendingAdminRequest(session_type="operator_follow_up", state=state)
+            return resumed_plan.user_response or self._question_for_missing_essential(resumed_plan.goal_type, resumed_plan.missing_essentials[0], state)
 
-        actions = self._build_actions_for_kind(session.pending_action_kind, session.draft, session.original_text)
         del self._sessions[session_key]
-        result = self.executor.execute(actions)
-        return self._render_execution_result(result)
+        return self._execute_goal_plan(resumed_plan, session_key)
 
-    def _cheap_route(self, text: str) -> VantaPlan | None:
-        lowered = text.lower().strip()
-        if not lowered:
-            return VantaPlan(reply=self._fallback_reply())
-
-        overview_actions = self._overview_actions(lowered)
-        if overview_actions:
-            return VantaPlan(actions=overview_actions)
-
-        if self._is_worker_listing_request(lowered):
-            return VantaPlan(actions=[AdminAction(kind="list_objects", params={"kind": "workers"}, summary="List workers")])
-        if self._is_task_listing_request(lowered):
-            return VantaPlan(actions=[AdminAction(kind="list_objects", params={"kind": "tasks"}, summary="List tasks")])
-        if self._is_service_listing_request(lowered):
-            return VantaPlan(actions=[AdminAction(kind="list_services", params={}, summary="List services")])
-        if self._is_skill_listing_request(lowered):
-            return VantaPlan(actions=[AdminAction(kind="list_skills", params={}, summary="List skills")])
-        if self._is_skill_review_request(lowered):
-            return VantaPlan(actions=[AdminAction(kind="review_skills", params={}, summary="Generate skill review report")])
-        if self._is_hub_status_request(lowered):
-            return VantaPlan(actions=[AdminAction(kind="inspect_status", params={"target": "hub"}, summary="Inspect hub status")])
-        worker_status_target = self._status_target(text)
-        if worker_status_target:
-            return VantaPlan(actions=[AdminAction(kind="inspect_status", params={"target": worker_status_target}, summary=f"Inspect {worker_status_target}")])
-        return None
-
-    def _plan_request(self, text: str) -> VantaPlan:
+    def _build_operator_goal_plan(self, text: str) -> OperatorGoalPlan:
         llm_plan = self._plan_with_llm(text)
         if llm_plan is not None:
             return llm_plan
         return self._plan_with_rules(text)
 
-    def _plan_with_llm(self, text: str) -> VantaPlan | None:
+    def _plan_with_llm(self, text: str) -> OperatorGoalPlan | None:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             return None
-
         packs = self._packs_for_text(text)
         manifest = self._manifest_prompt(packs)
         try:
             response = requests.post(
                 "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json={
                     "model": os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
                     "response_format": {"type": "json_object"},
@@ -289,10 +144,11 @@ class VantaAdminAgent:
                         {
                             "role": "system",
                             "content": (
-                                "You are Vanta, the Agentic Hub privileged admin planner. "
-                                "You are not a normal worker. Plan only against the provided capability manifest. "
-                                "Return valid JSON with actions, follow_up_question, follow_up_field, pending_action_kind, and reply. "
-                                "Use request_code_change only for executable code or hard-coded behavior changes.\n\n"
+                                "You are Vanta, the Agentic Hub admin operator. "
+                                "Act like a capable operator, not a form wizard. "
+                                "Explain the path briefly, choose safe defaults for runtime work, and ask only for missing essentials. "
+                                "Return valid JSON for OperatorGoalPlan. "
+                                "Use request_code_change for executable code or hard-coded behavior changes.\n\n"
                                 f"{manifest}"
                             ),
                         },
@@ -304,559 +160,786 @@ class VantaAdminAgent:
             response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]
             raw = str(content) if not isinstance(content, list) else "\n".join(str(item.get("text", "")) for item in content)
-            return VantaPlan.model_validate(json.loads(raw))
+            return OperatorGoalPlan.model_validate(json.loads(raw))
         except Exception:
             return None
 
-    def _plan_with_rules(self, text: str) -> VantaPlan:
+    def _plan_with_rules(self, text: str) -> OperatorGoalPlan:
         lowered = text.lower().strip()
-        if any(lowered.startswith(f"/{name}") for name in {"help", "status", "workers", "tasks", "inspect", "logs"}):
-            return VantaPlan(reply="Use the slash command directly for operational lookups.")
-
-        if self._is_explicit_skill_request(text):
-            draft = self._seed_draft(text, "propose_skill")
-            target_loadout_ids = draft.get("target_loadout_ids") or [draft.get("loadout_id", "operator_core")]
-            return VantaPlan(
-                actions=[
-                    AdminAction(
-                        kind="propose_skill",
-                        params={"request_text": text, "target_loadout_ids": target_loadout_ids, "explicit": True},
-                        summary="Draft a reusable skill proposal",
-                    )
-                ]
+        if any(lowered.startswith(f"/{name}") for name in READ_ONLY_COMMANDS):
+            return OperatorGoalPlan(
+                goal_type="read_only_lookup",
+                intent="read_only_lookup",
+                goal_summary="Use slash command directly",
+                user_response="Use the slash command directly for that operational check.",
+                reply_only=True,
             )
 
-        existing_worker_id = self._match_worker_id(text)
-        if ("start" in lowered or "stop" in lowered) and "bot" in lowered and existing_worker_id:
-            kind: AdminActionKind = "start_bot" if "start" in lowered else "stop_bot"
-            return VantaPlan(actions=[AdminAction(kind=kind, params={"worker_id": existing_worker_id}, summary=f"{kind} for {existing_worker_id}")])
+        if self._is_create_tool_request(lowered):
+            return self._low_level_tool_plan(text)
+
+        if self._is_explicit_skill_request(text):
+            target_loadout_ids = [self._seed_worker_draft(text).get("loadout_id", "operator_core")]
+            actions = [[AdminAction(kind="propose_skill", params={"request_text": text, "target_loadout_ids": target_loadout_ids, "explicit": True}, summary="Draft reusable skill proposal")]]
+            return OperatorGoalPlan(
+                goal_type="improve_worker_configuration",
+                intent="single_step_mutation",
+                goal_summary="Draft reusable skill",
+                user_response="I will draft a reusable skill proposal and bring it back for approval.",
+                steps=[OperatorPlanStep(step_id="propose_skill", summary="Draft skill proposal", status="ready", actions=actions[0])],
+                action_groups=actions,
+            )
+
+        if self._looks_like_scheduled_reminder_request(lowered):
+            return self._reminder_goal_plan(text)
+
+        worker_upgrade_plan = self._plan_worker_capability_request(text)
+        if worker_upgrade_plan is not None:
+            return worker_upgrade_plan
+
+        start_stop_plan = self._plan_start_or_stop_bot(text)
+        if start_stop_plan is not None:
+            return start_stop_plan
 
         if "attach" in lowered and "bot" in lowered:
-            return self._plan_or_follow_up("attach_managed_bot", text)
-
-        if self._is_create_tool_request(lowered):
-            return self._plan_or_follow_up("create_tool", text)
+            draft = self._seed_worker_draft(text)
+            missing = self._missing_fields_for("attach_managed_bot", draft)
+            return self._single_step_goal(
+                goal_type="attach_managed_bot",
+                intent="single_step_mutation",
+                goal_summary=f"Attach managed bot for {draft.get('worker_id', 'worker')}",
+                user_response=f"I can attach a managed bot for `{draft.get('worker_id', 'that worker')}`. I just need the worker and token.",
+                draft=draft,
+                missing=missing,
+            )
 
         tool_access_plan = self._plan_tool_access(text)
         if tool_access_plan is not None:
             return tool_access_plan
 
         if self._is_create_worker_request(lowered):
-            return self._plan_or_follow_up("create_worker", text)
+            draft = self._seed_worker_draft(text)
+            missing = self._missing_fields_for("create_worker", draft)
+            return self._single_step_goal(
+                goal_type="create_worker",
+                intent="single_step_mutation",
+                goal_summary=f"Create worker {draft.get('worker_id', 'worker')}",
+                user_response=f"I can set up `{draft.get('name', 'that worker')}` with a sensible runtime configuration.",
+                draft=draft,
+                missing=missing,
+            )
 
-        if any(word in lowered for word in {"inspect worker", "show worker", "worker status"}) and existing_worker_id:
-            return VantaPlan(
-                actions=[AdminAction(kind="inspect_status", params={"target": existing_worker_id}, summary=f"Inspect {existing_worker_id}")]
+        worker_id = self._match_worker_id(text)
+        if worker_id and any(word in lowered for word in {"improve", "better", "upgrade", "refine"}):
+            return OperatorGoalPlan(
+                goal_type="improve_worker_configuration",
+                intent="multi_step_operator_task",
+                goal_summary=f"Improve configuration for {worker_id}",
+                user_response=f"Yes - I can help improve `{worker_id}`. What outcome do you want most: better follow-up, reminders, outreach, or group coordination?",
+                chosen_defaults={"worker_id": worker_id},
+                missing_essentials=["improvement_target"],
+                reply_only=True,
             )
 
         if self._looks_like_repeated_skill_gap(text):
             gap_record = self.hub.skill_library.record_gap(text, explicit=False)
             if self.hub.skill_library.should_propose(gap_record, explicit=False):
-                draft = self._seed_draft(text, "propose_skill")
-                target_loadout_ids = draft.get("target_loadout_ids") or [draft.get("loadout_id", "operator_core")]
-                return VantaPlan(
-                    actions=[
-                        AdminAction(
-                            kind="propose_skill",
-                            params={"request_text": text, "target_loadout_ids": target_loadout_ids, "explicit": False},
-                            summary="Draft a reusable skill proposal from repeated demand",
-                        )
-                    ]
+                target_loadout_ids = [self._seed_worker_draft(text).get("loadout_id", "operator_core")]
+                actions = [[AdminAction(kind="propose_skill", params={"request_text": text, "target_loadout_ids": target_loadout_ids, "explicit": False}, summary="Draft reusable skill proposal from repeated demand")]]
+                return OperatorGoalPlan(
+                    goal_type="improve_worker_configuration",
+                    intent="single_step_mutation",
+                    goal_summary="Draft reusable skill from repeated demand",
+                    user_response="This keeps coming up, so I am drafting a reusable skill proposal for approval.",
+                    steps=[OperatorPlanStep(step_id="propose_skill", summary="Draft skill proposal", status="ready", actions=actions[0])],
+                    action_groups=actions,
                 )
-            return VantaPlan(reply="I noted that repeated capability request. If it keeps coming up, I’ll draft a reusable skill for approval.")
+            return OperatorGoalPlan(
+                goal_type="generic_admin_help",
+                intent="read_only_lookup",
+                goal_summary="Acknowledge repeated demand",
+                user_response="I noted that recurring need. If it keeps coming up, I will draft a reusable skill for approval.",
+                reply_only=True,
+            )
 
-        return VantaPlan(reply=self._fallback_reply())
+        return OperatorGoalPlan(
+            goal_type="generic_admin_help",
+            intent="read_only_lookup",
+            goal_summary="General admin help",
+            user_response=self._fallback_reply(text),
+            reply_only=True,
+        )
 
-    def _plan_or_follow_up(self, kind: AdminActionKind, text: str) -> VantaPlan:
-        draft = self._seed_draft(text, kind)
-        missing = self._missing_field(kind, draft)
+    def _cheap_route(self, text: str) -> OperatorGoalPlan | None:
+        lowered = text.lower().strip()
+        if not lowered:
+            return OperatorGoalPlan(goal_type="generic_admin_help", intent="read_only_lookup", goal_summary="General admin help", user_response=self._fallback_reply(text), reply_only=True)
+
+        action_groups: list[list[AdminAction]] = []
+        overview = self._overview_actions(lowered)
+        if overview:
+            action_groups = [overview]
+        elif self._is_worker_listing_request(lowered):
+            action_groups = [[AdminAction(kind="list_objects", params={"kind": "workers"}, summary="List workers")]]
+        elif self._is_task_listing_request(lowered):
+            action_groups = [[AdminAction(kind="list_objects", params={"kind": "tasks"}, summary="List tasks")]]
+        elif self._is_service_listing_request(lowered):
+            action_groups = [[AdminAction(kind="list_services", params={}, summary="List services")]]
+        elif self._is_skill_listing_request(lowered):
+            action_groups = [[AdminAction(kind="list_skills", params={}, summary="List skills")]]
+        elif self._is_skill_review_request(lowered):
+            action_groups = [[AdminAction(kind="review_skills", params={}, summary="Generate skill review report")]]
+        elif self._is_hub_status_request(lowered):
+            action_groups = [[AdminAction(kind="inspect_status", params={"target": "hub"}, summary="Inspect hub status")]]
+        else:
+            target = self._status_target(text)
+            if target:
+                action_groups = [[AdminAction(kind="inspect_status", params={"target": target}, summary=f"Inspect {target}")]]
+
+        if not action_groups:
+            return None
+        return OperatorGoalPlan(
+            goal_type="read_only_lookup",
+            intent="read_only_lookup",
+            goal_summary="Read-only admin lookup",
+            steps=[OperatorPlanStep(step_id="lookup", summary="Run admin lookup", status="ready", actions=action_groups[0])],
+            action_groups=action_groups,
+        )
+
+    def _execute_goal_plan(self, plan: OperatorGoalPlan, session_key: str) -> str:
+        if plan.missing_essentials:
+            self._sessions[session_key] = PendingAdminRequest(
+                session_type="operator_follow_up",
+                state=OperatorFollowUpState(
+                    goal_type=plan.goal_type,
+                    original_text=plan.goal_summary,
+                    current_stage="collect_essentials",
+                    unresolved_questions=list(plan.missing_essentials),
+                    inferred_defaults=dict(plan.chosen_defaults),
+                    drafted_action_groups=plan.action_groups,
+                    user_response_prefix=plan.user_response,
+                ),
+            )
+            return plan.user_response or self._question_for_missing_essential(plan.goal_type, plan.missing_essentials[0], self._sessions[session_key].state)
+
+        if plan.reply_only and not plan.action_groups:
+            return plan.user_response or self._fallback_reply("")
+
+        parts: list[str] = []
+        if plan.user_response:
+            parts.append(plan.user_response)
+        for action_group in plan.action_groups:
+            result = self.executor.execute(action_group)
+            rendered = self._render_execution_result(result)
+            if rendered:
+                parts.append(rendered)
+            skill_prompt = self._maybe_begin_skill_approval_session(session_key, result)
+            if skill_prompt:
+                parts.append(skill_prompt)
+            if result.status != "completed":
+                break
+        return "\n\n".join(part for part in parts if part) or self._fallback_reply("")
+
+    def _resume_operator_goal(self, state: OperatorFollowUpState) -> OperatorGoalPlan:
+        if state.goal_type == "set_up_scheduled_reminders":
+            worker_id = state.inferred_defaults.get("worker_id", "")
+            schedule = state.accumulated_answers.get("schedule", "").strip()
+            destination = state.accumulated_answers.get("destination", "").strip()
+            missing = [field for field, value in (("schedule", schedule), ("destination", destination)) if not value]
+            if missing:
+                return OperatorGoalPlan(
+                    goal_type="set_up_scheduled_reminders",
+                    intent="approval_gated_change",
+                    goal_summary=state.original_text,
+                    user_response=self._question_for_missing_essential("set_up_scheduled_reminders", missing[0], state),
+                    chosen_defaults=dict(state.inferred_defaults),
+                    missing_essentials=missing,
+                    reply_only=True,
+                )
+            summary = f"Draft a code change to enable scheduled reminders for worker `{worker_id}` on schedule `{schedule}` targeting `{destination}`."
+            actions = [[AdminAction(kind="request_code_change", params={"request_summary": summary, "worker_id": worker_id, "original_request": state.original_text}, summary=summary, requires_approval=True)]]
+            return OperatorGoalPlan(
+                goal_type="set_up_scheduled_reminders",
+                intent="approval_gated_change",
+                goal_summary=state.original_text,
+                user_response=f"That gives me enough to move forward. I am preparing an implementation proposal for `{worker_id}` to send reminders on `{schedule}` to `{destination}`.",
+                chosen_defaults={"worker_id": worker_id, "schedule": schedule, "destination": destination},
+                steps=[OperatorPlanStep(step_id="proposal", summary="Prepare reminder implementation proposal", status="ready", actions=actions[0])],
+                action_groups=actions,
+                requires_approval=True,
+            )
+
+        if state.goal_type in {"create_tool", "create_worker", "attach_managed_bot"}:
+            if state.goal_type == "create_tool":
+                draft = self._seed_tool_draft(state.original_text)
+                draft.update(state.inferred_defaults)
+                draft.update(state.accumulated_answers)
+                if draft.get("name") and not draft.get("tool_id"):
+                    draft["tool_id"] = self._slugify(draft["name"])
+                missing = self._missing_fields_for("create_tool", draft)
+                return self._single_step_goal("create_tool", "single_step_mutation", state.original_text, "I can create that tool.", draft, missing)
+
+            draft = self._seed_worker_draft(state.original_text)
+            draft.update(state.inferred_defaults)
+            draft.update(state.accumulated_answers)
+            kind = "attach_managed_bot" if state.goal_type == "attach_managed_bot" else "create_worker"
+            missing = self._missing_fields_for(kind, draft)
+            response = f"I will set up `{draft.get('name', draft.get('worker_id', 'that worker'))}`." if kind == "create_worker" else f"I will attach the managed bot for `{draft.get('worker_id', 'that worker')}`."
+            return self._single_step_goal(state.goal_type, "single_step_mutation", state.original_text, response, draft, missing)
+
+        if state.goal_type == "improve_worker_configuration":
+            worker_id = state.inferred_defaults.get("worker_id", "")
+            target = state.accumulated_answers.get("improvement_target", "").strip()
+            if not target:
+                return OperatorGoalPlan(
+                    goal_type="improve_worker_configuration",
+                    intent="multi_step_operator_task",
+                    goal_summary=state.original_text,
+                    user_response=self._question_for_missing_essential("improve_worker_configuration", "improvement_target", state),
+                    chosen_defaults=dict(state.inferred_defaults),
+                    missing_essentials=["improvement_target"],
+                    reply_only=True,
+                )
+            summary = f"Prepare a code change proposal to improve `{worker_id}` for `{target}`."
+            actions = [[AdminAction(kind="request_code_change", params={"request_summary": summary, "worker_id": worker_id, "original_request": state.original_text}, summary=summary, requires_approval=True)]]
+            return OperatorGoalPlan(
+                goal_type="prepare_code_change_request",
+                intent="approval_gated_change",
+                goal_summary=summary,
+                user_response=f"I have enough direction now. I am preparing an implementation proposal to improve `{worker_id}` for `{target}`.",
+                steps=[OperatorPlanStep(step_id="proposal", summary="Prepare improvement proposal", status="ready", actions=actions[0])],
+                action_groups=actions,
+                requires_approval=True,
+            )
+
+        if state.goal_type == "prepare_code_change_request":
+            model_name = state.accumulated_answers.get("model_name", "").strip()
+            if not model_name:
+                return OperatorGoalPlan(
+                    goal_type="prepare_code_change_request",
+                    intent="approval_gated_change",
+                    goal_summary=state.original_text,
+                    user_response="What model should this worker use?",
+                    chosen_defaults=dict(state.inferred_defaults),
+                    missing_essentials=["model_name"],
+                    reply_only=True,
+                )
+            worker_id = state.inferred_defaults.get("worker_id", "new_worker")
+            worker_name = state.inferred_defaults.get("worker_name", worker_id)
+            summary = f"Prepare a code change to create or upgrade worker `{worker_id}` (`{worker_name}`) using model `{model_name}` for request: {state.original_text}"
+            actions = [[AdminAction(kind="request_code_change", params={"request_summary": summary, "worker_id": worker_id, "model_name": model_name, "original_request": state.original_text}, summary=summary, requires_approval=True)]]
+            return OperatorGoalPlan(
+                goal_type="prepare_code_change_request",
+                intent="approval_gated_change",
+                goal_summary=summary,
+                user_response=f"That gives me enough to prepare the implementation proposal using model `{model_name}`.",
+                steps=[OperatorPlanStep(step_id="request_code_change", summary="Prepare code-change request", status="ready", actions=actions[0])],
+                action_groups=actions,
+                requires_approval=True,
+            )
+
+        return OperatorGoalPlan(goal_type="generic_admin_help", intent="read_only_lookup", goal_summary="General admin help", user_response=self._fallback_reply(state.original_text), reply_only=True)
+
+    def _single_step_goal(
+        self,
+        goal_type: Literal["create_worker", "create_tool", "attach_managed_bot"],
+        intent: Literal["single_step_mutation"],
+        goal_summary: str,
+        user_response: str,
+        draft: dict[str, Any],
+        missing: list[str],
+    ) -> OperatorGoalPlan:
         if missing:
-            return VantaPlan(
-                follow_up_question=self._follow_up_question(kind, missing, draft),
-                follow_up_field=missing,
-                pending_action_kind=kind,
+            state = OperatorFollowUpState(
+                goal_type=goal_type,
+                original_text=goal_summary,
+                current_stage="collect_essentials",
+                inferred_defaults={k: str(v) for k, v in draft.items() if v not in (None, "") and isinstance(v, (str, int, float, bool))},
             )
-        return VantaPlan(actions=self._build_actions_for_kind(kind, draft, text))
-
-    def _build_actions_for_kind(self, kind: AdminActionKind, draft: dict[str, Any], original_text: str) -> list[AdminAction]:
-        if kind == "create_worker":
-            return self._build_worker_actions(draft, original_text)
-        if kind == "attach_managed_bot":
-            return [
-                AdminAction(
-                    kind="attach_managed_bot",
-                    params={"worker_id": draft["worker_id"], "bot_token": draft["bot_token"]},
-                    summary=f"Attach managed Telegram bot for {draft['worker_id']}",
-                )
-            ]
-        if kind == "create_tool":
-            return [
-                AdminAction(
-                    kind="create_tool",
-                    params={
-                        "tool_id": draft["tool_id"],
-                        "name": draft["name"],
-                        "description": draft["description"],
-                        "implementation_ref": draft["implementation_ref"],
-                        "capability_tags": draft.get("capability_tags", []),
-                        "safety_level": draft.get("safety_level", "low"),
-                    },
-                    summary=f"Create tool {draft['tool_id']}",
-                )
-            ]
-        if kind == "grant_tool_access":
-            return [
-                AdminAction(
-                    kind="grant_tool_access",
-                    params={"worker_id": draft["worker_id"], "tool_id": draft["tool_id"]},
-                    summary=f"Grant tool access for {draft['worker_id']}",
-                )
-            ]
-        raise ValueError(f"Unsupported pending action kind: {kind}")
-
-    def _build_worker_actions(self, draft: dict[str, Any], original_text: str) -> list[AdminAction]:
-        if draft.get("needs_code_change"):
-            summary = (
-                f"Draft a code change for worker `{draft['worker_id']}` so it can {draft['requested_capability']} "
-                f"using model `{draft.get('model_name', 'unspecified')}`."
+            return OperatorGoalPlan(
+                goal_type=goal_type,
+                intent=intent,
+                goal_summary=goal_summary,
+                user_response=self._question_for_missing_essential(goal_type, missing[0], state),
+                chosen_defaults=dict(state.inferred_defaults),
+                missing_essentials=missing,
+                reply_only=True,
             )
-            return [
-                AdminAction(
-                    kind="request_code_change",
-                    params={
-                        "request_summary": summary,
-                        "worker_id": draft["worker_id"],
-                        "original_request": original_text,
-                    },
-                    summary=summary,
-                    requires_approval=True,
-                )
-            ]
+        action_kind: AdminActionKind = "create_tool" if goal_type == "create_tool" else "attach_managed_bot" if goal_type == "attach_managed_bot" else "create_worker"
+        params = self._action_params_for(action_kind, draft)
+        actions = [[AdminAction(kind=action_kind, params=params, summary=goal_summary)]]
+        return OperatorGoalPlan(
+            goal_type=goal_type,
+            intent=intent,
+            goal_summary=goal_summary,
+            user_response=user_response,
+            chosen_defaults={k: str(v) for k, v in draft.items() if v not in (None, "") and isinstance(v, (str, int, float, bool))},
+            steps=[OperatorPlanStep(step_id=action_kind, summary=goal_summary, status="ready", actions=actions[0])],
+            action_groups=actions,
+        )
 
-        params = {
-            "worker_id": draft["worker_id"],
-            "name": draft["name"],
-            "type_id": draft.get("type_id", "agent_worker"),
-            "role_id": draft.get("role_id", "operator"),
-            "loadout_id": draft.get("loadout_id", self._default_loadout_for_role(draft.get("role_id", "operator"))),
-            "interface_mode": draft.get("interface_mode", "internal"),
+    def _plan_start_or_stop_bot(self, text: str) -> OperatorGoalPlan | None:
+        lowered = text.lower()
+        worker_id = self._match_worker_id(text)
+        if worker_id is None or "bot" not in lowered:
+            return None
+        if "start" not in lowered and "stop" not in lowered:
+            return None
+        kind: AdminActionKind = "start_bot" if "start" in lowered else "stop_bot"
+        actions = [[AdminAction(kind=kind, params={"worker_id": worker_id}, summary=f"{kind} for {worker_id}")]]
+        return OperatorGoalPlan(
+            goal_type="configure_group_access",
+            intent="single_step_mutation",
+            goal_summary=f"{kind} for {worker_id}",
+            user_response=f"I will {kind.replace('_', ' ')} for `{worker_id}`.",
+            steps=[OperatorPlanStep(step_id=kind, summary=f"Run {kind}", status="ready", actions=actions[0])],
+            action_groups=actions,
+        )
+
+    def _plan_worker_capability_request(self, text: str) -> OperatorGoalPlan | None:
+        lowered = text.lower()
+        if not any(word in lowered for word in CREATE_WORDS):
+            return None
+        if not any(word in lowered for word in {"agent", "worker"}):
+            return None
+        if not any(word in lowered for word in {"image", "images", "capability", "ability", "on command", "model"}):
+            return None
+
+        draft = self._seed_worker_draft(text)
+        model_name = self._extract_model_name(text)
+        if not model_name:
+            return OperatorGoalPlan(
+                goal_type="prepare_code_change_request",
+                intent="approval_gated_change",
+                goal_summary=text,
+                user_response="I can help with that. What model should this worker use?",
+                chosen_defaults={"worker_id": draft.get("worker_id", ""), "worker_name": draft.get("name", "")},
+                missing_essentials=["model_name"],
+                reply_only=True,
+            )
+
+        summary = (
+            f"Prepare a code change to create worker `{draft.get('worker_id', 'new_worker')}` "
+            f"named `{draft.get('name', 'New Worker')}` with model `{model_name}` for request: {text}"
+        )
+        actions = [[AdminAction(kind="request_code_change", params={"request_summary": summary, "model_name": model_name, "worker_id": draft.get("worker_id"), "original_request": text}, summary=summary, requires_approval=True)]]
+        return OperatorGoalPlan(
+            goal_type="prepare_code_change_request",
+            intent="approval_gated_change",
+            goal_summary=summary,
+            user_response=f"I need a code-change proposal for that worker capability. I am preparing one for model `{model_name}`.",
+            steps=[OperatorPlanStep(step_id="request_code_change", summary="Prepare code-change request", status="ready", actions=actions[0])],
+            action_groups=actions,
+            requires_approval=True,
+        )
+
+    def _plan_tool_access(self, text: str) -> OperatorGoalPlan | None:
+        worker_id = self._match_worker_id(text)
+        if worker_id is None:
+            return None
+        lowered = text.lower()
+        if not any(phrase in lowered for phrase in {"give", "grant", "allow", "access"}):
+            return None
+
+        requested_tool = self._extract_requested_tool_label(text)
+        if not requested_tool:
+            return OperatorGoalPlan(
+                goal_type="enable_worker_capability",
+                intent="single_step_mutation",
+                goal_summary=f"Enable a capability for {worker_id}",
+                user_response=f"I can extend `{worker_id}`. What capability or tool should I give them access to?",
+                chosen_defaults={"worker_id": worker_id},
+                missing_essentials=["capability_name"],
+                reply_only=True,
+            )
+
+        tool_id = self._match_tool_id(requested_tool)
+        if tool_id is not None:
+            actions = [[AdminAction(kind="grant_tool_access", params={"worker_id": worker_id, "tool_id": tool_id}, summary=f"Grant {worker_id} access to {tool_id}")]]
+            return OperatorGoalPlan(
+                goal_type="enable_worker_capability",
+                intent="single_step_mutation",
+                goal_summary=f"Grant {worker_id} access to {tool_id}",
+                user_response=f"That already exists, so I can grant `{worker_id}` access to `{tool_id}` through their loadout.",
+                steps=[OperatorPlanStep(step_id="grant_tool_access", summary="Grant existing tool access", status="ready", actions=actions[0])],
+                action_groups=actions,
+            )
+
+        summary = f"Enable `{worker_id}` to use `{requested_tool}`. This likely needs a new tool or hard-coded model integration."
+        actions = [[AdminAction(kind="request_code_change", params={"request_summary": summary, "worker_id": worker_id, "requested_capability": requested_tool, "original_request": text}, summary=summary, requires_approval=True)]]
+        return OperatorGoalPlan(
+            goal_type="prepare_code_change_request",
+            intent="approval_gated_change",
+            goal_summary=summary,
+            user_response=f"I do not see `{requested_tool}` as an existing runtime tool, so I need to prepare a code-change proposal before I can add it to `{worker_id}`.",
+            steps=[OperatorPlanStep(step_id="request_code_change", summary="Prepare code-change request", status="ready", actions=actions[0])],
+            action_groups=actions,
+            requires_approval=True,
+        )
+
+    def _reminder_goal_plan(self, text: str) -> OperatorGoalPlan:
+        worker_id = self._match_worker_id(text) or "aria"
+        schedule = self._extract_schedule(text)
+        destination = self._extract_destination(text)
+        missing = []
+        if not schedule:
+            missing.append("schedule")
+        if not destination:
+            missing.append("destination")
+        response = f"Yes - that makes sense. To give `{worker_id}` scheduled reminders, I will need a reminder capability plus a schedule target."
+        if missing:
+            response = f"{response} {self._question_for_missing_essential('set_up_scheduled_reminders', missing[0], None)}"
+            return OperatorGoalPlan(
+                goal_type="set_up_scheduled_reminders",
+                intent="approval_gated_change",
+                goal_summary=text,
+                user_response=response,
+                chosen_defaults={"worker_id": worker_id, **({'schedule': schedule} if schedule else {}), **({'destination': destination} if destination else {})},
+                missing_essentials=missing,
+                reply_only=True,
+            )
+        return self._resume_operator_goal(
+            OperatorFollowUpState(
+                goal_type="set_up_scheduled_reminders",
+                original_text=text,
+                current_stage="proposal",
+                inferred_defaults={"worker_id": worker_id},
+                accumulated_answers={"schedule": schedule or "", "destination": destination or ""},
+            )
+        )
+
+    def _low_level_tool_plan(self, text: str) -> OperatorGoalPlan:
+        draft = self._seed_tool_draft(text)
+        missing = self._missing_fields_for("create_tool", draft)
+        return self._single_step_goal("create_tool", "single_step_mutation", text, "I can create that tool.", draft, missing)
+
+    def _seed_tool_draft(self, text: str) -> dict[str, Any]:
+        name = self._extract_name(text)
+        implementation_ref = self._extract_implementation_ref(text)
+        return {
+            "name": name,
+            "tool_id": self._slugify(name) if name else None,
+            "description": f"Runtime tool created from request: {text}",
+            "implementation_ref": implementation_ref,
+            "capability_tags": self._extract_capability_tags(text),
+            "safety_level": self._extract_safety_level(text),
+        }
+
+    def _seed_worker_draft(self, text: str) -> dict[str, Any]:
+        name = self._extract_name(text)
+        worker_id = self._slugify(name) if name else self._match_worker_id(text)
+        interface_mode = self._infer_interface_mode(text)
+        role_id = self._infer_role(text)
+        return {
+            "worker_id": worker_id,
+            "name": name or worker_id,
+            "type_id": "agent_worker",
+            "role_id": role_id,
+            "loadout_id": self._default_loadout_for_role(role_id),
+            "interface_mode": interface_mode,
             "enabled": True,
-            "owner": "vanta",
-            "notes": draft.get("notes", f"Created by Vanta from chat request: {original_text}"),
-            "tags": draft.get("tags", ["runtime", "vanta"]),
-            "assigned_queues": ["default"],
+            "tags": self._extract_capability_tags(text),
+            "bot_token": self._extract_bot_token(text),
             "smoke_test": True,
         }
-        if draft.get("bot_token"):
-            params["bot_token"] = draft["bot_token"]
-        return [AdminAction(kind="create_worker", params=params, summary=f"Create worker {draft['worker_id']}")]
 
-    def _seed_draft(self, text: str, kind: AdminActionKind | str) -> dict[str, Any]:
-        draft: dict[str, Any] = {}
-        if kind in {"create_worker", "attach_managed_bot", "propose_skill"}:
-            name = self._extract_name(text)
-            if name:
-                draft["name"] = name
-                draft["worker_id"] = self._slugify(name)
-
-            worker_id = self._match_worker_id(text)
-            if worker_id:
-                draft["worker_id"] = worker_id
-                if "name" not in draft:
-                    worker = self.hub.worker_registry.get_worker(worker_id)
-                    draft["name"] = worker.name
-
-            draft["type_id"] = self._match_known_id(text, [item.type_id for item in self.hub.worker_registry.list_types()]) or "agent_worker"
-            draft["role_id"] = self._match_known_id(text, [item.role_id for item in self.hub.worker_registry.list_roles()]) or self._infer_role(text)
-            draft["loadout_id"] = self._match_known_id(text, [item.loadout_id for item in self.hub.worker_registry.list_loadouts()]) or self._default_loadout_for_role(draft["role_id"])
-            draft["target_loadout_ids"] = [draft["loadout_id"]]
-            draft["interface_mode"] = self._infer_interface_mode(text)
-            token = TOKEN_PATTERN.search(text)
-            if token:
-                draft["bot_token"] = token.group(0)
-
-            capability = self._extract_requested_capability(text)
-            if capability:
-                draft["requested_capability"] = capability
-                draft["needs_code_change"] = True
-
-            model_name = self._extract_model_name(text)
-            if model_name:
-                draft["model_name"] = model_name
-            return draft
-
-        if kind in {"create_tool", "grant_tool_access"}:
-            name = self._extract_name(text)
-            if name and kind == "create_tool":
-                draft["name"] = name
-                draft["tool_id"] = self._slugify(name)
-            worker_id = self._match_worker_id(text)
-            if worker_id:
-                draft["worker_id"] = worker_id
-            tool_id = self._match_tool_id(text)
-            if tool_id:
-                draft["tool_id"] = tool_id
-                if "name" not in draft and kind == "create_tool":
-                    draft["name"] = tool_id.replace("_", " ").title()
-            implementation_ref = self._extract_implementation_ref(text)
-            if implementation_ref:
-                draft["implementation_ref"] = implementation_ref
-            if kind == "create_tool":
-                draft["description"] = text.strip().rstrip(".")
-            safety_level = self._extract_safety_level(text)
-            if safety_level:
-                draft["safety_level"] = safety_level
-            tags = self._extract_capability_tags(text)
-            if tags:
-                draft["capability_tags"] = tags
-        return draft
-
-    def _missing_field(self, kind: AdminActionKind, draft: dict[str, Any]) -> str | None:
+    def _missing_fields_for(self, kind: Literal["create_worker", "create_tool", "attach_managed_bot"], draft: dict[str, Any]) -> list[str]:
         if kind == "create_worker":
-            if "name" not in draft:
-                return "name"
-            if draft.get("interface_mode") == "managed" and "bot_token" not in draft:
-                return "bot_token"
-            if draft.get("needs_code_change") and "model_name" not in draft:
-                return "model_name"
-            return None
-        if kind == "attach_managed_bot":
-            if "worker_id" not in draft:
-                return "worker_id"
-            if "bot_token" not in draft:
-                return "bot_token"
-            return None
+            missing = ["name"] if not draft.get("name") else []
+            if draft.get("interface_mode") == "managed" and not draft.get("bot_token"):
+                missing.append("bot_token")
+            return missing
         if kind == "create_tool":
-            if "name" not in draft:
-                return "name"
-            if "implementation_ref" not in draft:
-                return "implementation_ref"
-            return None
-        if kind == "grant_tool_access":
-            if "worker_id" not in draft:
-                return "worker_id"
-            if "tool_id" not in draft:
-                return "tool_id"
-            return None
-        return None
+            return [field for field in ("name", "implementation_ref") if not draft.get(field)]
+        return [field for field in ("worker_id", "bot_token") if not draft.get(field)]
 
-    def _follow_up_question(self, kind: AdminActionKind, field_name: str, draft: dict[str, Any]) -> str:
-        if field_name == "name":
-            if kind == "create_tool":
-                return "What should I call the tool?"
-            return "What should I call the worker?"
-        if field_name == "bot_token":
-            return f"What Telegram bot token should I attach to `{draft.get('worker_id', 'that worker')}`?"
-        if field_name == "model_name":
-            return "What model should this worker use?"
-        if field_name == "worker_id":
-            return "Which worker should I attach the managed Telegram bot to?"
-        if field_name == "tool_id":
-            return f"Which tool should I grant to `{draft.get('worker_id', 'that worker')}`?"
-        if field_name == "implementation_ref":
-            return f"What implementation reference should I use for `{draft.get('tool_id', 'that tool')}`?"
-        return f"I need one more detail: {field_name}."
+    def _action_params_for(self, kind: Literal["create_worker", "create_tool", "attach_managed_bot"], draft: dict[str, Any]) -> dict[str, Any]:
+        if kind == "create_tool":
+            return {
+                "tool_id": draft["tool_id"],
+                "name": draft["name"],
+                "description": draft["description"],
+                "implementation_ref": draft["implementation_ref"],
+                "capability_tags": draft.get("capability_tags", []),
+                "safety_level": draft.get("safety_level", "low"),
+                "enabled": True,
+            }
+        if kind == "attach_managed_bot":
+            return {"worker_id": draft["worker_id"], "bot_token": draft["bot_token"]}
+        return {
+            "worker_id": draft["worker_id"],
+            "name": draft["name"],
+            "type_id": draft.get("type_id", "default_worker"),
+            "role_id": draft.get("role_id", "generalist"),
+            "loadout_id": draft.get("loadout_id", "operator_core"),
+            "interface_mode": draft.get("interface_mode", "internal"),
+            "enabled": bool(draft.get("enabled", True)),
+            "tags": list(draft.get("tags", [])),
+            "smoke_test": bool(draft.get("smoke_test", True)),
+            **({"bot_token": draft["bot_token"]} if draft.get("bot_token") else {}),
+        }
 
-    def _normalize_field(self, kind: AdminActionKind | Literal["skill_approval"], field_name: str, answer: str) -> Any:
-        value = answer.strip()
-        if field_name == "name":
-            return value
-        if field_name == "worker_id":
-            return self._slugify(value)
-        if field_name == "tool_id":
-            return self._slugify(value)
-        if field_name == "implementation_ref":
-            return value
-        if kind == "create_tool" and field_name == "tool_id":
-            return self._slugify(value)
-        return value
+    def _session_key(self, payload: dict[str, Any]) -> str:
+        source = str(payload.get("source", "unknown"))
+        chat_id = payload.get("chat_id", "unknown")
+        user_id = payload.get("user_id", "unknown")
+        return f"{source}:{chat_id}:{user_id}"
 
     def _render_execution_result(self, result: AdminExecutionResult) -> str:
-        if result.status in {"approval_required", "failed"}:
-            return result.summary
+        parts = [result.summary.strip()]
         validation_lines: list[str] = []
         for action_result in result.action_results:
             validation_lines.extend(action_result.validation_results)
-        if not validation_lines:
-            return result.summary
-        return "\n".join([result.summary, "", "Validation:", *[f"- {line}" for line in validation_lines]])
+        if validation_lines:
+            parts.extend(validation_lines)
+        return "\n".join(part for part in parts if part)
 
-    def _session_key(self, payload: dict[str, Any]) -> str:
-        return f"{payload.get('source', 'local')}:{payload.get('chat_id', 'default')}:{payload.get('user_id', 'anon')}"
+    def _maybe_begin_skill_approval_session(self, session_key: str, result: AdminExecutionResult) -> str | None:
+        if not result.action_results:
+            return None
+        for action_result in result.action_results:
+            if action_result.kind != "propose_skill" or not action_result.changed_ids:
+                continue
+            skill_id = action_result.changed_ids[0]
+            proposal = self.hub.skill_library.get_pending_proposal(skill_id)
+            if proposal is None:
+                continue
+            self._sessions[session_key] = PendingAdminRequest(session_type="skill_approval", skill_id=skill_id, target_loadout_ids=list(proposal.target_loadout_ids))
+            return f"Approve this skill?\n{proposal.approval_summary}"
+        return None
 
-    def _manifest_prompt(self, packs: list[str]) -> str:
-        capability_lines = []
-        for capability in self.get_capability_manifest(packs):
-            required = ", ".join(capability.required_argument_names) or "none"
-            capability_lines.append(
-                f"- {capability.capability_id}: {capability.label} | pack={capability.escalation_pack} | "
-                f"access={capability.access} | requires={required} | {capability.summary}"
-            )
-        return "Capability manifest:\n" + "\n".join(capability_lines)
+    def _question_for_missing_essential(self, goal_type: str, field_name: str, state: OperatorFollowUpState | None) -> str:
+        if goal_type == "set_up_scheduled_reminders":
+            if field_name == "schedule":
+                return "What schedule should Aria use for the reminders?"
+            if field_name == "destination":
+                return "Where should Aria send those reminders?"
+        if goal_type == "create_tool":
+            if field_name == "name":
+                return "What should I call the tool?"
+            if field_name == "implementation_ref":
+                tool_name = ""
+                if state is not None:
+                    tool_name = state.accumulated_answers.get("name") or state.inferred_defaults.get("name", "")
+                if tool_name:
+                    return f"What implementation reference should I use for `{self._title_case_fragment(tool_name)}`?"
+                return "What implementation reference should I use for that tool?"
+        if goal_type == "create_worker":
+            if field_name == "name":
+                return "What should I call the worker?"
+            if field_name == "bot_token":
+                return "What Telegram bot token should I use?"
+        if goal_type == "attach_managed_bot":
+            if field_name == "worker_id":
+                return "Which worker should I attach the Telegram bot to?"
+            if field_name == "bot_token":
+                return "What Telegram bot token should I use?"
+        if goal_type == "improve_worker_configuration" and field_name == "improvement_target":
+            worker_id = state.inferred_defaults.get("worker_id", "that worker") if state is not None else "that worker"
+            return f"What outcome do you want most for `{worker_id}`?"
+        if field_name == "capability_name":
+            return "What capability or tool should I add?"
+        return "What detail should I use to continue?"
+
+    def _fallback_reply(self, text: str) -> str:
+        if text.strip():
+            return "Tell me what you want to change in the hub, and I will figure out the setup path. I can inspect the system, create or update workers, attach bots, review skills, and prepare code-change proposals when runtime configuration is not enough."
+        return "Tell me what you want to change in the hub, and I will handle the setup path."
 
     def _packs_for_text(self, text: str) -> list[str]:
         lowered = text.lower()
-        packs = set(self.SYSTEM_CONFIG.default_packs)
-        if any(word in lowered for word in {"code", "repo", "file", "patch", "implementation"}):
-            packs.add("repo")
-        if any(word in lowered for word in {"web", "research", "search", "fetch", "look up"}):
-            packs.add("web")
-        if any(word in lowered for word in {"operator", "privileged", "escalate"}):
-            packs.add("operator")
-        return sorted(packs)
+        packs = ["default"]
+        if any(word in lowered for word in {"code", "repo", "implement", "model", "integration"}):
+            packs.append("repo")
+        if any(word in lowered for word in {"research", "search", "web"}):
+            packs.append("web")
+        if any(word in lowered for word in {"workflow", "operator", "admin"}):
+            packs.append("operator")
+        return packs
 
-    def _overview_actions(self, lowered: str) -> list[AdminAction]:
-        actions: list[AdminAction] = []
-        if ("status" in lowered or "inspect current" in lowered or "overview" in lowered) and ("hub" in lowered or "services" in lowered or "workers" in lowered or "tasks" in lowered):
-            actions.append(AdminAction(kind="inspect_status", params={"target": "hub"}, summary="Inspect hub status"))
-            if "workers" in lowered:
-                actions.append(AdminAction(kind="list_objects", params={"kind": "workers"}, summary="List workers"))
-            if "tasks" in lowered:
-                actions.append(AdminAction(kind="list_objects", params={"kind": "tasks"}, summary="List tasks"))
-            if "services" in lowered:
-                actions.append(AdminAction(kind="list_services", params={}, summary="List services"))
-        return actions
+    def _manifest_prompt(self, packs: list[str]) -> str:
+        lines = ["Available capability outcomes:"]
+        for item in self.get_capability_manifest(packs):
+            lines.append(f"- {item.capability_id}: {item.summary}")
+        return "\n".join(lines)
 
-    def _is_worker_listing_request(self, lowered: str) -> bool:
-        return any(
-            phrase in lowered
-            for phrase in {
-                "list workers",
-                "show workers",
-                "which workers",
-                "what are the workers",
-                "what workers",
-                "all workers",
-                "active workers",
-            }
-        )
-
-    def _is_task_listing_request(self, lowered: str) -> bool:
-        return any(phrase in lowered for phrase in {"list tasks", "show tasks", "what are the tasks", "active tasks"})
-
-    def _is_service_listing_request(self, lowered: str) -> bool:
-        return any(phrase in lowered for phrase in {"list services", "show services", "what are the services"})
-
-    def _is_skill_listing_request(self, lowered: str) -> bool:
-        return any(phrase in lowered for phrase in {"list skills", "show skills", "which skills"})
-
-    def _is_skill_review_request(self, lowered: str) -> bool:
-        return any(phrase in lowered for phrase in {"review skills", "monthly skill review", "skill review"})
-
-    def _is_hub_status_request(self, lowered: str) -> bool:
-        return any(phrase in lowered for phrase in {"hub status", "inspect hub", "show hub status"})
-
-    def _status_target(self, text: str) -> str | None:
-        lowered = text.lower().strip()
-        if "status" not in lowered and "inspect" not in lowered:
-            return None
-        if any(phrase in lowered for phrase in {"status of", "what is the status of", "what's the status of", "what is", "show status for"}):
-            worker_id = self._match_worker_id(text)
-            if worker_id:
-                return worker_id
-        return None
-
-    def _is_create_worker_request(self, lowered: str) -> bool:
-        return bool(CREATE_WORDS.intersection(lowered.split())) and any(word in lowered for word in {"worker", "agent", "telegram bot"})
+    def _is_explicit_low_level_create_tool(self, lowered: str) -> bool:
+        return lowered == "create tool" or lowered.startswith("create a tool") or lowered.startswith("create new tool") or lowered.startswith("create a new tool")
 
     def _is_create_tool_request(self, lowered: str) -> bool:
-        return bool(CREATE_WORDS.intersection(lowered.split())) and "tool" in lowered
+        return self._is_explicit_low_level_create_tool(lowered) or ("tool" in lowered and any(word in lowered for word in CREATE_WORDS))
+
+    def _is_explicit_skill_request(self, text: str) -> bool:
+        lowered = text.lower()
+        return "create a skill" in lowered or "make a skill" in lowered or "teach a skill" in lowered
+
+    def _looks_like_scheduled_reminder_request(self, lowered: str) -> bool:
+        return "reminder" in lowered and any(word in lowered for word in {"schedule", "scheduled", "daily", "weekly", "every"})
+
+    def _is_create_worker_request(self, lowered: str) -> bool:
+        return ("worker" in lowered or "bot" in lowered) and any(word in lowered for word in CREATE_WORDS)
 
     def _extract_name(self, text: str) -> str | None:
         patterns = [
-            r"(?:named|called)\s+([A-Za-z0-9 _-]+)",
-            r"new (?:internal |managed |hybrid )?(?:worker|agent|telegram bot|tool)\s+([A-Za-z0-9 _-]+)",
+            r"named\s+([a-z0-9 _-]+)",
+            r"call\s+(?:it|them|the worker|the tool)\s+([a-z0-9 _-]+)",
+            r"tool named\s+([a-z0-9 _-]+)",
+            r"worker named\s+([a-z0-9 _-]+)",
         ]
+        lowered = text.lower()
         for pattern in patterns:
-            match = re.search(pattern, text, flags=re.IGNORECASE)
+            match = re.search(pattern, lowered)
             if match:
-                return match.group(1).strip().strip(".?!")
+                return self._title_case_fragment(match.group(1))
+        cleaned = text.strip()
+        if cleaned and cleaned.lower() not in {"create tool", "create worker"} and len(cleaned.split()) <= 4 and not any(token in cleaned for token in {":", "/", "."}):
+            return self._title_case_fragment(cleaned)
         return None
+
+    def _title_case_fragment(self, value: str) -> str:
+        cleaned = value.replace("_", " ").replace("-", " ")
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" .!?`'\"")
+        return " ".join(part.capitalize() for part in cleaned.split()) if cleaned else cleaned
 
     def _match_worker_id(self, text: str) -> str | None:
         lowered = text.lower()
-        for worker_id in self.hub.worker_registry.worker_ids():
-            if worker_id.lower() in lowered:
-                return worker_id
+        for worker in self.hub.worker_registry.list_workers():
+            if worker.worker_id.lower() in lowered or worker.name.lower() in lowered:
+                return worker.worker_id
         return None
 
     def _match_tool_id(self, text: str) -> str | None:
-        lowered = text.lower()
-        for tool in self.hub.catalog_manager.list_objects("tools"):
-            if tool.tool_id.lower() in lowered:
+        lowered = self._slugify(text)
+        for tool in self.hub.tool_registry.list_all():
+            if tool.tool_id == lowered or tool.tool_id in text.lower() or tool.name.lower() in text.lower():
                 return tool.tool_id
-        return None
-
-    def _match_known_id(self, text: str, values: list[str]) -> str | None:
-        lowered = text.lower()
-        for value in values:
-            if value.lower() in lowered:
-                return value
         return None
 
     def _infer_interface_mode(self, text: str) -> str:
         lowered = text.lower()
         if "managed" in lowered or "telegram bot" in lowered:
             return "managed"
-        if "hybrid" in lowered:
-            return "hybrid"
         return "internal"
 
     def _infer_role(self, text: str) -> str:
         lowered = text.lower()
         if "research" in lowered:
             return "researcher"
-        if "review" in lowered:
-            return "reviewer"
-        if "coordinate" in lowered:
-            return "coordinator"
+        if any(word in lowered for word in {"operator", "admin"}):
+            return "operator"
+        if any(word in lowered for word in {"band", "music", "reminder", "follow-up", "follow up"}):
+            return "band_assistant"
         return "operator"
 
     def _default_loadout_for_role(self, role_id: str) -> str:
-        return {
-            "operator": "operator_core",
-            "researcher": "research_core",
-            "reviewer": "review_core",
-            "coordinator": "coordinator_core",
-            "band_assistant": "aria_band_core",
-        }.get(role_id, "operator_core")
+        if role_id == "operator":
+            return "operator_core"
+        for loadout in self.hub.worker_registry.list_loadouts():
+            if loadout.loadout_id == "operator_core":
+                return loadout.loadout_id
+        loadouts = self.hub.worker_registry.list_loadouts()
+        return loadouts[0].loadout_id if loadouts else "operator_core"
 
-    def _extract_requested_capability(self, text: str) -> str | None:
+    def _extract_implementation_ref(self, text: str) -> str | None:
+        stripped = text.strip()
+        if "." in stripped and " " not in stripped and "/" not in stripped:
+            return stripped
+        match = re.search(r"(agentic_hub\.[A-Za-z0-9_.]+)", stripped)
+        if match:
+            return match.group(1)
+        return None
+
+    def _extract_bot_token(self, text: str) -> str | None:
+        match = TOKEN_PATTERN.search(text)
+        return match.group(0) if match else None
+
+    def _extract_capability_tags(self, text: str) -> list[str]:
+        tokens = re.findall(r"[a-z0-9]+", text.lower())
+        ignored = {"create", "make", "tool", "worker", "named", "new", "a", "the", "and"}
+        tags = [token for token in tokens if token not in ignored]
+        return list(dict.fromkeys(tags[:5]))
+
+    def _extract_safety_level(self, text: str) -> str:
         lowered = text.lower()
-        if "on command" in lowered or re.search(r"\bthat\s+(creates|generates|builds|does)\b", lowered):
-            return text.strip()
+        if "high risk" in lowered or "danger" in lowered:
+            return "high"
+        if "moderate" in lowered or "medium" in lowered:
+            return "medium"
+        return "low"
+
+    def _extract_requested_tool_label(self, text: str) -> str | None:
+        lowered = text.lower().replace("'s", " ")
+        if "nano-banana" in lowered:
+            return "google nano-banana"
+        match = re.search(r"(?:access to|access|use)\s+([a-z0-9 _.-]+)", lowered)
+        if match:
+            return match.group(1).strip(" .!?")
         return None
 
     def _extract_model_name(self, text: str) -> str | None:
-        lowered = text.lower()
+        lowered = text.lower().replace("'s", " ")
         if "nano-banana" in lowered:
-            return "Nano-banana"
-        match = re.search(r"model\s+([A-Za-z0-9._-]+)", text, flags=re.IGNORECASE)
+            return "nano-banana"
+        match = re.search(r"(?:model|use)\s+([a-z0-9 _.-]+)", lowered)
         if match:
-            return match.group(1)
+            return match.group(1).strip(" .!?")
         return None
 
-    def _extract_implementation_ref(self, text: str) -> str | None:
-        match = re.search(r"(agentic_hub\.[A-Za-z0-9_./-]+|[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+)", text)
-        if match:
-            return match.group(1)
-        return None
-
-    def _extract_safety_level(self, text: str) -> str | None:
+    def _extract_schedule(self, text: str) -> str | None:
         lowered = text.lower()
-        for level in ("low", "medium", "high"):
-            if f"safety {level}" in lowered or f"{level} safety" in lowered:
-                return level
-        return None
+        match = re.search(r"(every [a-z0-9: ]+|daily|weekly|monthly)", lowered)
+        return match.group(1).strip() if match else None
 
-    def _extract_capability_tags(self, text: str) -> list[str]:
+    def _extract_destination(self, text: str) -> str | None:
         lowered = text.lower()
-        tags = []
-        for tag in ("hub", "admin", "telegram", "repo", "web", "skill"):
-            if tag in lowered:
-                tags.append(tag)
-        return tags
+        match = re.search(r"(?:to|into|in)\s+([#@a-z0-9 _-]+)$", lowered)
+        return match.group(1).strip() if match else None
 
-    def _plan_tool_access(self, text: str) -> VantaPlan | None:
-        lowered = text.lower()
-        if not any(phrase in lowered for phrase in {"give", "grant", "allow", "access to", "ability to access", "use "}):
+    def _slugify(self, value: str | None) -> str | None:
+        if not value:
             return None
-        worker_id = self._match_worker_id(text)
-        if worker_id is None:
-            return None
-        tool = self._match_tool(text)
-        if tool is not None:
-            return VantaPlan(
-                actions=[
-                    AdminAction(
-                        kind="grant_tool_access",
-                        params={"worker_id": worker_id, "tool_id": tool.tool_id},
-                        summary=f"Grant {worker_id} access to {tool.tool_id}",
-                    )
-                ]
-            )
-        if any(word in lowered for word in {"model", "tool", "nano-banana", "nanobanana", "google"}):
-            requested_tool = self._extract_requested_tool_label(text)
-            summary = (
-                f"Draft a code change to add support for `{requested_tool}` and make it available to worker `{worker_id}`."
-            )
-            return VantaPlan(
-                actions=[
-                    AdminAction(
-                        kind="request_code_change",
-                        params={"request_summary": summary, "worker_id": worker_id, "original_request": text},
-                        summary=summary,
-                        requires_approval=True,
-                    )
-                ]
-            )
-        return None
-
-    def _match_tool(self, text: str):
-        lowered = text.lower()
-        for tool in self.hub.catalog_manager.list_objects("tools"):
-            if tool.tool_id.lower() in lowered or tool.name.lower() in lowered:
-                return tool
-        return None
-
-    def _extract_requested_tool_label(self, text: str) -> str:
-        lowered = text.lower()
-        if "nano-banana" in lowered or "nanobanana" in lowered:
-            return "google nano-banana"
-        return text.strip()
-
-    def _slugify(self, value: str) -> str:
-        slug = value.strip().lower().replace(" ", "_")
-        return "".join(ch for ch in slug if ch.isalnum() or ch == "_")
+        normalized = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+        return normalized or None
 
     def _looks_like_repeated_skill_gap(self, text: str) -> bool:
         lowered = text.lower()
-        return any(
-            phrase in lowered
-            for phrase in {
-                "we need",
-                "keep needing",
-                "often need",
-                "repeatedly need",
-                "remember how to",
-                "should know how to",
-            }
-        )
+        return any(phrase in lowered for phrase in {"playbook", "consistent", "repeatable", "standard process", "triage"})
 
-    def _is_explicit_skill_request(self, text: str) -> bool:
+    def _overview_actions(self, lowered: str) -> list[AdminAction] | None:
+        if all(word in lowered for word in {"hub", "workers", "tasks"}) and "services" in lowered:
+            return [
+                AdminAction(kind="inspect_status", params={"target": "hub"}, summary="Inspect hub status"),
+                AdminAction(kind="list_objects", params={"kind": "workers"}, summary="List workers"),
+                AdminAction(kind="list_objects", params={"kind": "tasks"}, summary="List tasks"),
+                AdminAction(kind="list_services", params={}, summary="List services"),
+            ]
+        return None
+
+    def _is_worker_listing_request(self, lowered: str) -> bool:
+        return any(phrase in lowered for phrase in {"list workers", "show workers", "what are the workers", "which workers", "workers do we have"})
+
+    def _is_task_listing_request(self, lowered: str) -> bool:
+        return any(phrase in lowered for phrase in {"list tasks", "show tasks", "what are the tasks", "which tasks"})
+
+    def _is_service_listing_request(self, lowered: str) -> bool:
+        return any(phrase in lowered for phrase in {"list services", "show services", "what services"})
+
+    def _is_skill_listing_request(self, lowered: str) -> bool:
+        return any(phrase in lowered for phrase in {"list skills", "show skills", "what skills"})
+
+    def _is_skill_review_request(self, lowered: str) -> bool:
+        return "review skills" in lowered or "skill review" in lowered
+
+    def _is_hub_status_request(self, lowered: str) -> bool:
+        return any(phrase in lowered for phrase in {"hub status", "status of the hub", "what is the status of the hub", "what is the status of hub", "show hub status"})
+
+    def _status_target(self, text: str) -> str | None:
         lowered = text.lower()
-        return any(phrase in lowered for phrase in {"make a skill", "create a skill", "build a skill", "draft a skill"})
-
-    def _maybe_begin_skill_approval_session(
-        self,
-        session_key: str,
-        actions: list[AdminAction],
-        result: AdminExecutionResult,
-        rendered: str,
-    ) -> str:
-        if result.status != "completed":
-            return rendered
-        proposal_action = next((action for action in actions if action.kind == "propose_skill"), None)
-        if proposal_action is None:
-            return rendered
-        changed_ids = [item for action_result in result.action_results for item in action_result.changed_ids]
-        if not changed_ids:
-            return rendered
-        self._sessions[session_key] = PendingAdminRequest(
-            session_type="skill_approval",
-            pending_action_kind="skill_approval",
-            original_text=str(proposal_action.params["request_text"]),
-            draft={
-                "skill_id": changed_ids[0],
-                "target_loadout_ids": list(proposal_action.params.get("target_loadout_ids", [])),
-            },
-        )
-        return "\n".join([rendered, "", "Approve this skill? Reply `approve` or `reject`."])
-
-    def _fallback_reply(self) -> str:
-        labels = ", ".join(capability.label for capability in self.default_capabilities() if capability.escalation_pack == "default")
-        return (
-            "I can handle hub admin tasks in plain English. "
-            f"Default capabilities: {labels}. "
-            "For direct operational checks, slash commands still work."
-        )
+        if any(phrase in lowered for phrase in {"status of", "inspect", "show status for", "worker status"}):
+            for worker in self.hub.worker_registry.list_workers():
+                if worker.worker_id.lower() in lowered or worker.name.lower() in lowered:
+                    return worker.worker_id
+            for service_name in self.hub.service_manager._services:
+                if service_name.lower() in lowered:
+                    return service_name
+        return None

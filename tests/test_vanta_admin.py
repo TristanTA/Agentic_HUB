@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
-
 from agentic_hub.core.hub import Hub
 
 
@@ -115,32 +113,16 @@ def test_plain_language_overview_request_lists_workers_tasks_and_services(tmp_pa
     assert "telegram" not in result or "No services found." in result or "|" in result
 
 
-def test_list_workers_follow_up_does_not_turn_into_create_worker(tmp_path, monkeypatch) -> None:
+def test_plain_language_worker_list_stays_read_only(tmp_path) -> None:
     hub = build_hub(tmp_path)
-    monkeypatch.setattr(
-        hub.vanta_admin,
-        "_cheap_route",
-        lambda text: SimpleNamespace(
-            actions=[],
-            follow_up_question="Would you also like a list of all the active workers and their statuses?",
-            follow_up_field=None,
-            pending_action_kind=None,
-            reply=None,
-        ) if text.lower() == "what are the workers?" else None,
-    )
 
-    first = hub.vanta_admin.handle_message(
+    result = hub.vanta_admin.handle_message(
         "what are the workers?",
         {"source": "telegram", "chat_id": 1, "user_id": 2},
     )
-    second = hub.vanta_admin.handle_message(
-        "yes",
-        {"source": "telegram", "chat_id": 1, "user_id": 2},
-    )
 
-    assert "Default capabilities:" in first
-    assert "What should I call the worker?" not in second
-    assert "Default capabilities:" in second
+    assert "aria" in result
+    assert "What should I call the worker?" not in result
 
 
 def test_explicit_skill_request_requires_approval_before_attachment(tmp_path) -> None:
@@ -175,7 +157,7 @@ def test_repeated_requests_trigger_skill_proposal(tmp_path) -> None:
         {"source": "telegram", "chat_id": 2, "user_id": 3},
     )
 
-    assert "noted that repeated capability request" in first
+    assert "I noted that recurring need." in first
     assert "Approve this skill?" in second
 
 
@@ -195,6 +177,62 @@ def test_create_tool_in_runtime_overrides(tmp_path) -> None:
 
     assert "Created tool `banana_logger`." in result
     assert hub.tool_registry.get("banana_logger").implementation_ref == "agentic_hub.tools.banana.logger"
+
+
+def test_reminder_request_behaves_like_operator_not_capability_dump(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    first = hub.vanta_admin.handle_message(
+        "Hey Vanta, I want to give Aria the ability to send reminders out on a schedule. What do you think?",
+        {"source": "telegram", "chat_id": 11, "user_id": 12},
+    )
+
+    assert "scheduled reminders" in first.lower()
+    assert "What schedule should Aria use" in first
+    assert "Default capabilities:" not in first
+
+    second = hub.vanta_admin.handle_message(
+        "every monday at 9am",
+        {"source": "telegram", "chat_id": 11, "user_id": 12},
+    )
+
+    assert "Where should Aria send those reminders?" in second
+
+    third = hub.vanta_admin.handle_message(
+        "to the band group chat",
+        {"source": "telegram", "chat_id": 11, "user_id": 12},
+    )
+
+    assert "Approval required before changing executable code" in third
+    assert "reminders" in third.lower()
+
+
+def test_create_tool_low_level_path_still_works(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    first = hub.vanta_admin.handle_message(
+        "create tool",
+        {"source": "telegram", "chat_id": 21, "user_id": 22},
+    )
+    second = hub.vanta_admin.handle_message(
+        "schedule_telegram_reminder",
+        {"source": "telegram", "chat_id": 21, "user_id": 22},
+    )
+
+    assert "What should I call the tool?" in first
+    assert "What implementation reference should I use for `Schedule Telegram Reminder`?" in second
+
+
+def test_improve_worker_request_asks_for_outcome_not_capability_dump(tmp_path) -> None:
+    hub = build_hub(tmp_path)
+
+    result = hub.vanta_admin.handle_message(
+        "Can you make Aria better at band follow-up?",
+        {"source": "telegram", "chat_id": 31, "user_id": 32},
+    )
+
+    assert "What outcome do you want most" in result
+    assert "Default capabilities:" not in result
 
 
 def test_default_capability_manifest_stays_compact(tmp_path) -> None:
